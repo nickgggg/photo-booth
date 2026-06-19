@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#101112">
+    <title>Wedding Photo Booth</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="booth" data-ring="off">
+      <section class="stage" aria-label="Camera preview and capture result">
+        <video id="camera" class="camera" autoplay playsinline muted></video>
+        <canvas id="snapshot" class="hidden"></canvas>
+        <div id="result" class="result hidden" aria-live="polite"></div>
+        <div id="countdown" class="countdown hidden" aria-live="assertive"></div>
+        <div class="privacy">Private session. No previous photos are shown.</div>
+      </section>
+
+      <section class="controls" aria-label="Photo booth controls">
+        <button id="startCamera" class="primary wide" type="button">Start Camera</button>
+
+        <div class="row">
+          <label class="field">
+            <span>Timer</span>
+            <select id="timer">
+              <option value="0">Off</option>
+              <option value="3" selected>3 sec</option>
+              <option value="5">5 sec</option>
+              <option value="10">10 sec</option>
+            </select>
+          </label>
+
+          <label class="toggle">
+            <input id="ringLight" type="checkbox">
+            <span>Ring light</span>
+          </label>
+        </div>
+
+        <div class="row action-row">
+          <button id="takePhoto" class="primary" type="button" disabled>Take Photo</button>
+          <button id="recordVideo" type="button" disabled>Record Video</button>
+        </div>
+
+        <div class="row">
+          <button id="shareCapture" type="button" disabled>Share</button>
+          <a id="downloadCapture" class="button disabled" href="#" download aria-disabled="true">Download</a>
+          <button id="deleteCapture" class="danger" type="button" disabled>Delete</button>
+        </div>
+
+        <p id="status" class="status">Tap Start Camera, allow camera access, then go full screen.</p>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

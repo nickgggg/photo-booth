@@ -1,0 +1,252 @@
+:root {
+  color-scheme: light;
+  --ink: #171918;
+  --muted: #5f6661;
+  --paper: #fbfaf6;
+  --panel: #ffffff;
+  --line: #d9ded8;
+  --accent: #0f7f68;
+  --accent-dark: #095746;
+  --danger: #b33a30;
+  --danger-dark: #80261f;
+  --shadow: 0 18px 45px rgba(20, 24, 21, 0.16);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  overflow: hidden;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.booth {
+  min-height: 100svh;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.stage {
+  position: relative;
+  min-height: 0;
+  background: #111312;
+  overflow: hidden;
+}
+
+.camera,
+.result video,
+.result img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.result {
+  position: absolute;
+  inset: 0;
+  background: #111312;
+}
+
+.privacy {
+  position: absolute;
+  left: max(16px, env(safe-area-inset-left));
+  bottom: 14px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #222522;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.countdown {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.18);
+  color: white;
+  font-size: min(34svh, 180px);
+  font-weight: 900;
+  text-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+}
+
+.controls {
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  padding: 14px max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+  display: grid;
+  gap: 12px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.action-row {
+  grid-template-columns: 1fr 1fr;
+}
+
+button,
+.button,
+select {
+  min-height: 56px;
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+button,
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  cursor: pointer;
+  user-select: none;
+}
+
+button:active,
+.button:active {
+  transform: translateY(1px);
+}
+
+button:disabled,
+.button.disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  transform: none;
+}
+
+.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.primary:active {
+  background: var(--accent-dark);
+}
+
+.danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.danger:active {
+  background: var(--danger-dark);
+  color: white;
+}
+
+.wide {
+  width: 100%;
+}
+
+.field {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.field select {
+  width: 100%;
+  padding: 0 12px;
+  appearance: none;
+}
+
+.toggle {
+  min-height: 56px;
+  grid-column: span 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 14px;
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.toggle input {
+  width: 28px;
+  height: 28px;
+  accent-color: var(--accent);
+}
+
+.status {
+  margin: 0;
+  min-height: 20px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.booth[data-ring="on"]::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+  border: clamp(18px, 4vw, 46px) solid rgba(255, 255, 255, 0.95);
+  box-shadow: inset 0 0 70px rgba(255, 255, 255, 0.55);
+}
+
+@media (orientation: landscape) and (min-width: 850px) {
+  .booth {
+    grid-template-columns: minmax(0, 1fr) 340px;
+    grid-template-rows: 1fr;
+  }
+
+  .controls {
+    align-content: center;
+  }
+
+  .row,
+  .action-row {
+    grid-template-columns: 1fr;
+  }
+
+  .toggle {
+    grid-column: span 1;
+  }
+}
+
+@media (max-width: 520px) {
+  button,
+  .button,
+  select,
+  .toggle {
+    min-height: 52px;
+    font-size: 16px;
+  }
+
+  .row {
+    gap: 8px;
+  }
+}
