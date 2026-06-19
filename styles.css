@@ -1,16 +1,16 @@
 :root {
   color-scheme: light;
-  --ink: #221719;
-  --muted: #75666a;
-  --paper: #fff7dd;
-  --panel: #fffdf4;
-  --line: #ecd58f;
-  --accent: #d7356b;
-  --accent-dark: #a81e4c;
-  --blue: #127c99;
+  --ink: #23120f;
+  --muted: #7c3d36;
+  --paper: #ffe66b;
+  --panel: #fff8c9;
+  --line: #23120f;
+  --accent: #f23566;
+  --accent-dark: #bb1744;
+  --blue: #00a6b2;
   --danger: #b33a30;
   --danger-dark: #80261f;
-  --shadow: 0 18px 45px rgba(55, 22, 27, 0.2);
+  --shadow: 0 20px 0 rgba(35, 18, 15, 0.18);
 }
 
 * {
@@ -25,7 +25,7 @@ body {
 
 body {
   background:
-    linear-gradient(90deg, rgba(215, 53, 107, 0.06) 0 10px, transparent 10px 24px),
+    repeating-linear-gradient(90deg, #ffe66b 0 30px, #ff96b3 30px 60px, #8ae6df 60px 90px),
     var(--paper);
   color: var(--ink);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -43,7 +43,10 @@ body {
 .stage {
   position: relative;
   min-height: 0;
-  background: #211719;
+  background:
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.16), transparent 34%),
+    #23120f;
+  border: 10px solid #23120f;
   overflow: hidden;
 }
 
@@ -53,7 +56,7 @@ body {
   width: 100%;
   height: 100%;
   display: block;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .booth[data-filter="warm"] .camera,
@@ -77,7 +80,7 @@ body {
 .result {
   position: absolute;
   inset: 0;
-  background: #211719;
+  background: #23120f;
 }
 
 .privacy {
@@ -98,15 +101,15 @@ body {
   top: 0;
   left: 0;
   right: 0;
-  height: 34px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: space-around;
   gap: 18px;
-  background: #fff4bc;
-  color: #d7356b;
-  border-bottom: 3px solid #221719;
-  font-size: 14px;
+  background: repeating-linear-gradient(90deg, #fff8c9 0 18px, #f23566 18px 36px);
+  color: #23120f;
+  border-bottom: 5px solid #23120f;
+  font-size: 18px;
   font-weight: 1000;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -123,18 +126,18 @@ body {
 .booth-logo {
   position: absolute;
   right: max(16px, env(safe-area-inset-right));
-  top: 52px;
-  padding: 8px 10px;
-  border: 3px solid #fff7dd;
+  top: 68px;
+  padding: 12px 14px;
+  border: 5px solid #fff8c9;
   border-radius: 8px;
-  background: #d7356b;
-  color: #fff7dd;
-  font-size: clamp(16px, 2.6vw, 28px);
+  background: #f23566;
+  color: #fff8c9;
+  font-size: clamp(22px, 4vw, 46px);
   font-weight: 1000;
   line-height: 0.9;
   text-transform: uppercase;
   transform: rotate(2deg);
-  box-shadow: 0 7px 0 rgba(0, 0, 0, 0.18);
+  box-shadow: 0 10px 0 rgba(0, 0, 0, 0.24);
 }
 
 .booth-logo span {
@@ -145,14 +148,14 @@ body {
 .sticker {
   position: absolute;
   left: max(20px, env(safe-area-inset-left));
-  top: 56px;
-  max-width: min(270px, 42vw);
-  padding: 10px 14px;
-  border: 3px solid #221719;
+  top: 76px;
+  max-width: min(360px, 48vw);
+  padding: 14px 18px;
+  border: 5px solid #23120f;
   border-radius: 8px;
   background: #ffe777;
   color: #221719;
-  font-size: clamp(17px, 3vw, 34px);
+  font-size: clamp(24px, 4.8vw, 58px);
   font-weight: 1000;
   text-transform: uppercase;
   transform: rotate(-4deg);
@@ -162,7 +165,7 @@ body {
 .sticker-party {
   top: auto;
   right: max(20px, env(safe-area-inset-right));
-  bottom: 64px;
+  bottom: 74px;
   left: auto;
   background: #95e0d0;
   transform: rotate(3deg);
@@ -189,12 +192,13 @@ body {
 
 .controls {
   background:
-    linear-gradient(90deg, transparent 0 16px, rgba(18, 124, 153, 0.08) 16px 32px),
+    repeating-linear-gradient(135deg, rgba(242, 53, 102, 0.1) 0 14px, transparent 14px 28px),
     var(--panel);
   box-shadow: var(--shadow);
   padding: 14px max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
   display: grid;
   gap: 12px;
+  border-top: 8px solid #23120f;
 }
 
 .row {
@@ -211,14 +215,14 @@ button,
 .button,
 select {
   min-height: 56px;
-  border: 2px solid var(--line);
+  border: 3px solid var(--line);
   border-radius: 8px;
-  background: #fff;
+  background: #fffdf0;
   color: var(--ink);
   font: inherit;
   font-size: 18px;
   font-weight: 800;
-  box-shadow: 0 4px 0 rgba(34, 23, 25, 0.14);
+  box-shadow: 0 5px 0 rgba(35, 18, 15, 0.28);
 }
 
 button,
@@ -247,6 +251,31 @@ button:disabled,
   background: var(--accent);
   border-color: var(--accent);
   color: white;
+}
+
+.brand-lockup {
+  min-height: 74px;
+  display: grid;
+  place-items: center;
+  border: 5px solid #23120f;
+  border-radius: 8px;
+  background: #00a6b2;
+  color: #fff8c9;
+  font-weight: 1000;
+  line-height: 0.86;
+  text-align: center;
+  text-transform: uppercase;
+  transform: rotate(-1deg);
+  box-shadow: 0 8px 0 rgba(35, 18, 15, 0.24);
+}
+
+.brand-lockup span {
+  font-size: 28px;
+}
+
+.brand-lockup strong {
+  color: #ffe66b;
+  font-size: 36px;
 }
 
 .primary:active {
@@ -290,16 +319,18 @@ button:disabled,
   align-items: center;
   gap: 12px;
   padding: 0 14px;
-  border: 2px solid var(--line);
+  border: 3px solid var(--line);
   border-radius: 8px;
   font-size: 18px;
   font-weight: 800;
   background: #fff;
-  box-shadow: 0 4px 0 rgba(34, 23, 25, 0.14);
+  box-shadow: 0 5px 0 rgba(35, 18, 15, 0.28);
 }
 
 .compact {
-  grid-column: span 1;
+  grid-column: auto;
+  width: 100%;
+  justify-content: center;
 }
 
 .toggle input {
@@ -315,6 +346,35 @@ button:disabled,
   font-size: 14px;
   font-weight: 700;
   text-align: center;
+}
+
+.overlay-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.mini-label {
+  color: #7c3d36;
+  font-size: 13px;
+  font-weight: 1000;
+  text-transform: uppercase;
+}
+
+.chip-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.chip {
+  min-height: 46px;
+  padding: 0 8px;
+  font-size: 15px;
+}
+
+.chip.selected {
+  background: #00a6b2;
+  color: #fff;
 }
 
 .hidden {
@@ -368,16 +428,22 @@ button:disabled,
   border-left: clamp(28px, 5vw, 52px) solid #fff;
 }
 
-@media (orientation: landscape) and (min-width: 850px) {
+@media (min-width: 700px) {
   .booth {
-    grid-template-columns: minmax(0, 1fr) 380px;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 34vw);
     grid-template-rows: 1fr;
   }
 
   .controls {
     align-content: center;
-    gap: 10px;
+    gap: 9px;
     padding: 12px;
+    border-top: 0;
+    border-left: 8px solid #23120f;
+  }
+
+  .brand-lockup {
+    min-height: 66px;
   }
 }
 

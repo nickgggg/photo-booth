@@ -20,7 +20,7 @@
         <video id="camera" class="camera" autoplay playsinline muted></video>
         <canvas id="snapshot" class="hidden"></canvas>
         <div id="liveOverlays" class="live-overlays" aria-hidden="true">
-          <div class="booth-logo">brick<span>2026</span></div>
+          <div class="booth-logo">BRICK<span>2026</span></div>
           <div class="sticker sticker-heart">Just married</div>
           <div class="sticker sticker-party">Party proof</div>
         </div>
@@ -30,6 +30,11 @@
       </section>
 
       <section class="controls" aria-label="Photo booth controls">
+        <div class="brand-lockup" aria-hidden="true">
+          <span>BRICK</span>
+          <strong>2026</strong>
+        </div>
+
         <button id="startCamera" class="primary wide" type="button">Start Camera</button>
 
         <div class="row">
@@ -49,25 +54,21 @@
           </label>
         </div>
 
-        <div class="row overlay-row">
-          <label class="field">
-            <span>Filter</span>
-            <select id="filter">
-              <option value="none" selected>Clean</option>
-              <option value="warm">Warm glow</option>
-              <option value="flash">Flash pop</option>
-              <option value="mono">Old booth</option>
-            </select>
-          </label>
+        <div class="overlay-panel">
+          <div class="mini-label">Filter</div>
+          <div class="chip-row" role="group" aria-label="Filter">
+            <button class="chip selected" type="button" data-filter-choice="none">Clean</button>
+            <button class="chip" type="button" data-filter-choice="warm">Warm</button>
+            <button class="chip" type="button" data-filter-choice="flash">Flash</button>
+            <button class="chip" type="button" data-filter-choice="mono">B/W</button>
+          </div>
 
-          <label class="field">
-            <span>Sticker</span>
-            <select id="sticker">
-              <option value="none" selected>None</option>
-              <option value="heart">Just married</option>
-              <option value="party">Party proof</option>
-            </select>
-          </label>
+          <div class="mini-label">Sticker</div>
+          <div class="chip-row" role="group" aria-label="Sticker">
+            <button class="chip selected" type="button" data-sticker-choice="none">None</button>
+            <button class="chip" type="button" data-sticker-choice="heart">Married</button>
+            <button class="chip" type="button" data-sticker-choice="party">Party</button>
+          </div>
 
           <label class="toggle compact">
             <input id="logoOverlay" type="checkbox" checked>

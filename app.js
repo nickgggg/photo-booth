@@ -9,8 +9,6 @@ const els = {
   startCamera: document.getElementById("startCamera"),
   timer: document.getElementById("timer"),
   ringLight: document.getElementById("ringLight"),
-  filter: document.getElementById("filter"),
-  sticker: document.getElementById("sticker"),
   logoOverlay: document.getElementById("logoOverlay"),
   takePhoto: document.getElementById("takePhoto"),
   recordVideo: document.getElementById("recordVideo"),
@@ -25,6 +23,8 @@ let recorder = null;
 let chunks = [];
 let currentCapture = null;
 let busy = false;
+let selectedFilter = "none";
+let selectedSticker = "none";
 
 function setStatus(message) {
   els.status.textContent = message;
@@ -150,7 +150,7 @@ async function takePhoto() {
   canvas.width = video.videoWidth || 1280;
   canvas.height = video.videoHeight || 720;
   const ctx = canvas.getContext("2d");
-  ctx.filter = filterForCanvas(els.filter.value);
+  ctx.filter = filterForCanvas(selectedFilter);
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
   ctx.filter = "none";
   drawPhotoOverlays(ctx, canvas.width, canvas.height);
@@ -257,14 +257,22 @@ els.shareCapture.addEventListener("click", shareCapture);
 els.ringLight.addEventListener("change", () => {
   els.booth.dataset.ring = els.ringLight.checked ? "on" : "off";
 });
-els.filter.addEventListener("change", () => {
-  els.booth.dataset.filter = els.filter.value;
-});
-els.sticker.addEventListener("change", () => {
-  els.booth.dataset.sticker = els.sticker.value;
-});
 els.logoOverlay.addEventListener("change", () => {
   els.booth.dataset.logo = els.logoOverlay.checked ? "on" : "off";
+});
+document.querySelectorAll("[data-filter-choice]").forEach((button) => {
+  button.addEventListener("click", () => {
+    selectedFilter = button.dataset.filterChoice;
+    els.booth.dataset.filter = selectedFilter;
+    setSelected("[data-filter-choice]", button);
+  });
+});
+document.querySelectorAll("[data-sticker-choice]").forEach((button) => {
+  button.addEventListener("click", () => {
+    selectedSticker = button.dataset.stickerChoice;
+    els.booth.dataset.sticker = selectedSticker;
+    setSelected("[data-sticker-choice]", button);
+  });
 });
 
 window.addEventListener("pagehide", () => {
@@ -291,8 +299,8 @@ function filterForCanvas(filterName) {
 function drawPhotoOverlays(ctx, width, height) {
   const scale = Math.max(1, width / 1280);
   if (els.logoOverlay.checked) drawLogo(ctx, width, scale);
-  if (els.sticker.value === "heart") drawSticker(ctx, "JUST MARRIED", 34 * scale, 86 * scale, -0.07, "#ffe777", scale);
-  if (els.sticker.value === "party") drawSticker(ctx, "PARTY PROOF", width - 420 * scale, height - 130 * scale, 0.05, "#95e0d0", scale);
+  if (selectedSticker === "heart") drawSticker(ctx, "JUST MARRIED", 34 * scale, 86 * scale, -0.07, "#ffe777", scale);
+  if (selectedSticker === "party") drawSticker(ctx, "PARTY PROOF", width - 420 * scale, height - 130 * scale, 0.05, "#95e0d0", scale);
 }
 
 function drawLogo(ctx, width, scale) {
@@ -350,4 +358,10 @@ function roundedRect(ctx, x, y, width, height, radius) {
   ctx.arcTo(x, y + height, x, y, radius);
   ctx.arcTo(x, y, x + width, y, radius);
   ctx.closePath();
+}
+
+function setSelected(selector, selectedButton) {
+  document.querySelectorAll(selector).forEach((button) => {
+    button.classList.toggle("selected", button === selectedButton);
+  });
 }
