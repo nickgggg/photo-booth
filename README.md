@@ -25,7 +25,9 @@ The ring light toggle adds a large soft white screen border. For best results at
 
 ## Overlays
 
-Guests can pick a lightweight filter, add a sticker, and toggle the `brick2026` mark. Photo overlays are burned into downloaded/shared photos. Video overlays appear in the booth preview/playback UI; keeping them burned into videos would require a more complex canvas-recording path and more device testing on iPad Safari.
+Guests can pick a filter, add a sticker, drag it around the camera preview, pinch to resize it, and toggle the `brick2026` mark. Photo overlays are burned into downloaded/shared photos. Video overlays appear in the booth preview/playback UI; keeping them burned into videos would require a more complex canvas-recording path and more device testing on iPad Safari.
+
+Mac and iOS camera features such as Center Stage can crop or reframe before the browser receives the video. The app itself uses `object-fit: contain` so it does not add another crop on top.
 
 ## Printer notes
 

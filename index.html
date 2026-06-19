@@ -19,10 +19,9 @@
         </div>
         <video id="camera" class="camera" autoplay playsinline muted></video>
         <canvas id="snapshot" class="hidden"></canvas>
-        <div id="liveOverlays" class="live-overlays" aria-hidden="true">
+        <div id="liveOverlays" class="live-overlays">
           <div class="booth-logo">BRICK<span>2026</span></div>
-          <div class="sticker sticker-heart">Just married</div>
-          <div class="sticker sticker-party">Party proof</div>
+          <div id="editableSticker" class="editable-sticker hidden" aria-label="Selected sticker">NORBITLUVR</div>
         </div>
         <div id="result" class="result hidden" aria-live="polite"></div>
         <div id="countdown" class="countdown hidden" aria-live="assertive"></div>
@@ -61,13 +60,19 @@
             <button class="chip" type="button" data-filter-choice="warm">Warm</button>
             <button class="chip" type="button" data-filter-choice="flash">Flash</button>
             <button class="chip" type="button" data-filter-choice="mono">B/W</button>
+            <button class="chip" type="button" data-filter-choice="acid">Acid</button>
+            <button class="chip" type="button" data-filter-choice="disco">Disco</button>
+            <button class="chip" type="button" data-filter-choice="dream">Dream</button>
+            <button class="chip" type="button" data-filter-choice="vhs">VHS</button>
           </div>
 
           <div class="mini-label">Sticker</div>
           <div class="chip-row" role="group" aria-label="Sticker">
             <button class="chip selected" type="button" data-sticker-choice="none">None</button>
-            <button class="chip" type="button" data-sticker-choice="heart">Married</button>
-            <button class="chip" type="button" data-sticker-choice="party">Party</button>
+            <button class="chip" type="button" data-sticker-choice="norbit">NORBITLUVR</button>
+            <button class="chip" type="button" data-sticker-choice="brickdup">BRICKDUP</button>
+            <button class="chip" type="button" data-sticker-choice="congrats">CONGRATS</button>
+            <button class="chip emoji-chip" type="button" data-sticker-choice="diamond">💎</button>
           </div>
 
           <label class="toggle compact">

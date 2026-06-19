@@ -4,6 +4,8 @@ const els = {
   booth: document.querySelector(".booth"),
   camera: document.getElementById("camera"),
   snapshot: document.getElementById("snapshot"),
+  liveOverlays: document.getElementById("liveOverlays"),
+  editableSticker: document.getElementById("editableSticker"),
   result: document.getElementById("result"),
   countdown: document.getElementById("countdown"),
   startCamera: document.getElementById("startCamera"),
@@ -25,6 +27,15 @@ let currentCapture = null;
 let busy = false;
 let selectedFilter = "none";
 let selectedSticker = "none";
+const stickerState = {
+  x: 0.34,
+  y: 0.24,
+  scale: 1,
+  text: "NORBITLUVR"
+};
+const activePointers = new Map();
+let dragStart = null;
+let pinchStart = null;
 
 function setStatus(message) {
   els.status.textContent = message;
@@ -270,10 +281,16 @@ document.querySelectorAll("[data-filter-choice]").forEach((button) => {
 document.querySelectorAll("[data-sticker-choice]").forEach((button) => {
   button.addEventListener("click", () => {
     selectedSticker = button.dataset.stickerChoice;
+    stickerState.text = stickerText(selectedSticker);
     els.booth.dataset.sticker = selectedSticker;
     setSelected("[data-sticker-choice]", button);
+    updateSticker();
   });
 });
+els.editableSticker.addEventListener("pointerdown", startStickerGesture);
+window.addEventListener("pointermove", moveStickerGesture);
+window.addEventListener("pointerup", endStickerGesture);
+window.addEventListener("pointercancel", endStickerGesture);
 
 window.addEventListener("pagehide", () => {
   clearCapture();
@@ -281,10 +298,14 @@ window.addEventListener("pagehide", () => {
 });
 
 setBusy(false);
+updateSticker();
 
 function cloneLiveOverlays() {
   const overlays = document.getElementById("liveOverlays").cloneNode(true);
   overlays.id = "";
+  overlays.querySelectorAll("[id]").forEach((node) => {
+    node.removeAttribute("id");
+  });
   overlays.className = "capture-overlays";
   return overlays;
 }
@@ -293,14 +314,20 @@ function filterForCanvas(filterName) {
   if (filterName === "warm") return "sepia(0.24) saturate(1.18) contrast(1.04)";
   if (filterName === "flash") return "brightness(1.12) contrast(1.16) saturate(1.22)";
   if (filterName === "mono") return "grayscale(1) contrast(1.18)";
+  if (filterName === "acid") return "hue-rotate(105deg) saturate(2.6) contrast(1.35)";
+  if (filterName === "disco") return "hue-rotate(245deg) saturate(3) contrast(1.18) brightness(1.08)";
+  if (filterName === "dream") return "sepia(0.18) saturate(1.9) hue-rotate(310deg) brightness(1.18) blur(0.5px)";
+  if (filterName === "vhs") return "contrast(1.45) saturate(1.8) hue-rotate(185deg)";
   return "none";
 }
 
 function drawPhotoOverlays(ctx, width, height) {
   const scale = Math.max(1, width / 1280);
   if (els.logoOverlay.checked) drawLogo(ctx, width, scale);
-  if (selectedSticker === "heart") drawSticker(ctx, "JUST MARRIED", 34 * scale, 86 * scale, -0.07, "#ffe777", scale);
-  if (selectedSticker === "party") drawSticker(ctx, "PARTY PROOF", width - 420 * scale, height - 130 * scale, 0.05, "#95e0d0", scale);
+  if (selectedSticker !== "none") {
+    const point = stickerCanvasPoint(width, height);
+    drawSticker(ctx, stickerState.text, point.x, point.y, -0.07, stickerFill(), scale * stickerState.scale);
+  }
 }
 
 function drawLogo(ctx, width, scale) {
@@ -327,15 +354,16 @@ function drawLogo(ctx, width, scale) {
   ctx.restore();
 }
 
-function drawSticker(ctx, text, x, y, rotation, fill, scale) {
+function drawSticker(ctx, text, centerX, centerY, rotation, fill, scale) {
   const paddingX = 18 * scale;
   const paddingY = 12 * scale;
   ctx.save();
-  ctx.font = `${34 * scale}px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif`;
+  const isDiamond = text === "💎";
+  ctx.font = `${isDiamond ? 74 * scale : 34 * scale}px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif`;
   const metrics = ctx.measureText(text);
   const width = metrics.width + paddingX * 2;
-  const height = 58 * scale;
-  ctx.translate(x + width / 2, y + height / 2);
+  const height = (isDiamond ? 94 : 58) * scale;
+  ctx.translate(centerX, centerY);
   ctx.rotate(rotation);
   ctx.fillStyle = fill;
   ctx.strokeStyle = "#221719";
@@ -364,4 +392,152 @@ function setSelected(selector, selectedButton) {
   document.querySelectorAll(selector).forEach((button) => {
     button.classList.toggle("selected", button === selectedButton);
   });
+}
+
+function stickerText(value) {
+  if (value === "norbit") return "NORBITLUVR";
+  if (value === "brickdup") return "BRICKDUP";
+  if (value === "congrats") return "CONGRATS";
+  if (value === "diamond") return "💎";
+  return "";
+}
+
+function stickerFill() {
+  if (selectedSticker === "brickdup") return "#95e0d0";
+  if (selectedSticker === "congrats") return "#ff96b3";
+  if (selectedSticker === "diamond") return "#8ae6df";
+  return "#ffe777";
+}
+
+function updateSticker() {
+  const hidden = selectedSticker === "none";
+  els.editableSticker.classList.toggle("hidden", hidden);
+  els.editableSticker.classList.toggle("diamond", selectedSticker === "diamond");
+  els.editableSticker.textContent = stickerState.text;
+  els.editableSticker.style.setProperty("--sticker-x", `${stickerState.x * 100}%`);
+  els.editableSticker.style.setProperty("--sticker-y", `${stickerState.y * 100}%`);
+  els.editableSticker.style.setProperty("--sticker-scale", String(stickerState.scale));
+}
+
+function startStickerGesture(event) {
+  if (selectedSticker === "none") return;
+  event.preventDefault();
+  els.editableSticker.setPointerCapture(event.pointerId);
+  activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  els.editableSticker.classList.add("dragging");
+
+  if (activePointers.size === 1) {
+    dragStart = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      stickerX: stickerState.x,
+      stickerY: stickerState.y
+    };
+    pinchStart = null;
+  } else {
+    dragStart = null;
+    pinchStart = makePinchStart();
+  }
+}
+
+function moveStickerGesture(event) {
+  if (!activePointers.has(event.pointerId)) return;
+  event.preventDefault();
+  activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+  if (activePointers.size >= 2) {
+    if (!pinchStart) pinchStart = makePinchStart();
+    const points = [...activePointers.values()];
+    const currentDistance = distance(points[0], points[1]);
+    const currentCenter = midpoint(points[0], points[1]);
+    const stageRect = document.querySelector(".stage").getBoundingClientRect();
+    const ratio = currentDistance / Math.max(1, pinchStart.distance);
+
+    stickerState.scale = clamp(pinchStart.scale * ratio, 0.55, 2.6);
+    stickerState.x = clamp(pinchStart.stickerX + (currentCenter.x - pinchStart.center.x) / stageRect.width, 0.08, 0.92);
+    stickerState.y = clamp(pinchStart.stickerY + (currentCenter.y - pinchStart.center.y) / stageRect.height, 0.08, 0.92);
+    updateSticker();
+    return;
+  }
+
+  if (!dragStart || dragStart.pointerId !== event.pointerId) return;
+  const stageRect = document.querySelector(".stage").getBoundingClientRect();
+  stickerState.x = clamp(dragStart.stickerX + (event.clientX - dragStart.x) / stageRect.width, 0.08, 0.92);
+  stickerState.y = clamp(dragStart.stickerY + (event.clientY - dragStart.y) / stageRect.height, 0.08, 0.92);
+  updateSticker();
+}
+
+function endStickerGesture(event) {
+  if (!activePointers.has(event.pointerId)) return;
+  activePointers.delete(event.pointerId);
+
+  if (activePointers.size === 0) {
+    dragStart = null;
+    pinchStart = null;
+    els.editableSticker.classList.remove("dragging");
+    return;
+  }
+
+  if (activePointers.size === 1) {
+    const remaining = activePointers.entries().next().value;
+    dragStart = {
+      pointerId: remaining[0],
+      x: remaining[1].x,
+      y: remaining[1].y,
+      stickerX: stickerState.x,
+      stickerY: stickerState.y
+    };
+    pinchStart = null;
+  }
+}
+
+function makePinchStart() {
+  const points = [...activePointers.values()];
+  return {
+    distance: distance(points[0], points[1]),
+    center: midpoint(points[0], points[1]),
+    scale: stickerState.scale,
+    stickerX: stickerState.x,
+    stickerY: stickerState.y
+  };
+}
+
+function distance(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function midpoint(a, b) {
+  return {
+    x: (a.x + b.x) / 2,
+    y: (a.y + b.y) / 2
+  };
+}
+
+function stickerCanvasPoint(width, height) {
+  const stageRect = document.querySelector(".stage").getBoundingClientRect();
+  const videoRect = mediaDisplayRect(stageRect.width, stageRect.height, els.camera.videoWidth || width, els.camera.videoHeight || height);
+  const stageX = stickerState.x * stageRect.width;
+  const stageY = stickerState.y * stageRect.height;
+  const clampedX = clamp(stageX, videoRect.x, videoRect.x + videoRect.width);
+  const clampedY = clamp(stageY, videoRect.y, videoRect.y + videoRect.height);
+  return {
+    x: ((clampedX - videoRect.x) / videoRect.width) * width,
+    y: ((clampedY - videoRect.y) / videoRect.height) * height
+  };
+}
+
+function mediaDisplayRect(stageWidth, stageHeight, mediaWidth, mediaHeight) {
+  const stageRatio = stageWidth / stageHeight;
+  const mediaRatio = mediaWidth / mediaHeight;
+  if (mediaRatio > stageRatio) {
+    const height = stageWidth / mediaRatio;
+    return { x: 0, y: (stageHeight - height) / 2, width: stageWidth, height };
+  }
+  const width = stageHeight * mediaRatio;
+  return { x: (stageWidth - width) / 2, y: 0, width, height: stageHeight };
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
 }
