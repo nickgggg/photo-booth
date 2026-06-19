@@ -21,7 +21,7 @@
         <video id="camera" class="camera" autoplay playsinline muted></video>
         <canvas id="snapshot" class="hidden"></canvas>
         <div id="liveOverlays" class="live-overlays">
-          <div class="booth-logo">BRIX<span>PIX</span></div>
+          <div class="booth-logo">brick2026</div>
           <div id="stickersLayer" class="stickers-layer" aria-label="Stickers"></div>
         </div>
         <div id="result" class="result hidden" aria-live="polite"></div>
@@ -89,20 +89,31 @@
             <button class="chip emoji-chip" type="button" data-sticker-choice="married">💒</button>
             <button class="chip emoji-chip" type="button" data-sticker-choice="horsefart">🐎💨</button>
           </div>
+        </div>
 
+        <div class="control-section sticker-actions">
+          <div class="mini-label">Sticker Tools</div>
           <div class="sticker-tools">
             <button id="rotateSticker" class="tool-button" type="button">Rotate</button>
             <button id="removeSticker" class="tool-button" type="button">Remove</button>
-            <label class="toggle compact">
-              <input id="logoOverlay" type="checkbox" checked>
-              <span>Logo</span>
-            </label>
           </div>
+        </div>
+
+        <div class="control-section logo-section">
+          <label class="toggle compact">
+            <input id="logoOverlay" type="checkbox" checked>
+            <span>Brick watermark</span>
+          </label>
         </div>
 
         <div id="adminPanel" class="admin-panel hidden">
           <button id="exportArchive" type="button">Export Saved Photos</button>
           <span id="archiveCount">0 saved</span>
+          <label class="webhook-field">
+            <span>Webhook URL</span>
+            <input id="uploadEndpoint" type="url" inputmode="url" placeholder="Google Apps Script URL">
+          </label>
+          <button id="saveUploadEndpoint" type="button">Save Webhook</button>
           <small>Saved inside this web app on this iPad. Export to move into Photos/files.</small>
         </div>
 

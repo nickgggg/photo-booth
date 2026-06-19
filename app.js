@@ -21,6 +21,8 @@ const els = {
   shareCapture: document.getElementById("shareCapture"),
   adminPanel: document.getElementById("adminPanel"),
   exportArchive: document.getElementById("exportArchive"),
+  uploadEndpoint: document.getElementById("uploadEndpoint"),
+  saveUploadEndpoint: document.getElementById("saveUploadEndpoint"),
   archiveCount: document.getElementById("archiveCount"),
   status: document.getElementById("status")
 };
@@ -28,6 +30,7 @@ const els = {
 const DB_NAME = "brixpix-archive";
 const DB_VERSION = 1;
 const STORE_NAME = "photos";
+const UPLOAD_ENDPOINT_KEY = "brixpixUploadEndpoint";
 const isAdmin = new URLSearchParams(location.search).has("admin");
 
 let stream = null;
@@ -71,16 +74,11 @@ async function startCamera() {
   setBusy(true);
 
   try {
-    if (stream) stream.getTracks().forEach((track) => track.stop());
+    stopCameraStream();
+    els.camera.srcObject = null;
+    await new Promise((resolve) => setTimeout(resolve, 120));
 
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: "user",
-        width: { ideal: 1920 },
-        height: { ideal: 1080 }
-      },
-      audio: true
-    });
+    stream = await navigator.mediaDevices.getUserMedia(getMediaConstraints());
 
     els.camera.srcObject = stream;
     await els.camera.play();
@@ -96,10 +94,29 @@ async function startCamera() {
   }
 }
 
+function getMediaConstraints() {
+  const landscape = window.innerWidth > window.innerHeight;
+  return {
+    video: {
+      facingMode: "user",
+      width: { ideal: landscape ? 1920 : 1080 },
+      height: { ideal: landscape ? 1080 : 1920 }
+    },
+    audio: true
+  };
+}
+
+function stopCameraStream() {
+  if (!stream) return;
+  stream.getTracks().forEach((track) => track.stop());
+  stream = null;
+}
+
 function restartCameraForOrientation() {
   if (!stream || busy) return;
   clearTimeout(orientationRestartTimer);
   orientationRestartTimer = setTimeout(() => {
+    els.tapToStart.classList.add("hidden");
     startCamera().then(() => {
       setStatus("Camera adjusted.");
     }).catch(() => {
@@ -613,9 +630,42 @@ async function archivePhoto(blob) {
       tx.onerror = () => reject(tx.error);
     });
     updateArchiveCount();
+    uploadPhoto(blob);
   } catch (error) {
     setStatus("Photo ready. Archive save failed on this browser.");
   }
+}
+
+async function uploadPhoto(blob) {
+  const endpoint = localStorage.getItem(UPLOAD_ENDPOINT_KEY);
+  if (!endpoint) return;
+
+  try {
+    const dataUrl = await blobToDataUrl(blob);
+    await fetch(endpoint, {
+      method: "POST",
+      mode: "no-cors",
+      headers: {
+        "Content-Type": "text/plain"
+      },
+      body: JSON.stringify({
+        fileName: `brixpix-${Date.now()}.jpg`,
+        mimeType: blob.type || "image/jpeg",
+        dataUrl
+      })
+    });
+  } catch (error) {
+    // Keep upload failures invisible to guests. Local archive still has the photo.
+  }
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
 }
 
 async function getArchivedPhotos() {
@@ -655,6 +705,18 @@ async function exportArchive() {
     setTimeout(() => URL.revokeObjectURL(url), 5000);
     await new Promise((resolve) => setTimeout(resolve, 220));
   }
+}
+
+function loadUploadEndpoint() {
+  if (!isAdmin) return;
+  els.uploadEndpoint.value = localStorage.getItem(UPLOAD_ENDPOINT_KEY) || "";
+}
+
+function saveUploadEndpoint() {
+  const value = els.uploadEndpoint.value.trim();
+  if (value) localStorage.setItem(UPLOAD_ENDPOINT_KEY, value);
+  else localStorage.removeItem(UPLOAD_ENDPOINT_KEY);
+  setStatus(value ? "Webhook saved on this iPad." : "Webhook removed.");
 }
 
 function clamp(value, min, max) {
@@ -720,14 +782,19 @@ window.addEventListener("pointerup", endStickerGesture);
 window.addEventListener("pointercancel", endStickerGesture);
 window.addEventListener("orientationchange", restartCameraForOrientation);
 window.addEventListener("resize", restartCameraForOrientation);
+if (window.visualViewport) {
+  window.visualViewport.addEventListener("resize", restartCameraForOrientation);
+}
 window.addEventListener("pagehide", () => {
   clearCapture();
-  if (stream) stream.getTracks().forEach((track) => track.stop());
+  stopCameraStream();
 });
 
 if (isAdmin) {
   els.adminPanel.classList.remove("hidden");
   els.exportArchive.addEventListener("click", exportArchive);
+  els.saveUploadEndpoint.addEventListener("click", saveUploadEndpoint);
+  loadUploadEndpoint();
   updateArchiveCount();
 }
 

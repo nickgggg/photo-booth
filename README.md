@@ -19,6 +19,8 @@ To export saved photos, open the app on the same iPad with `?admin=1` at the end
 
 GitHub Pages cannot receive automatic background uploads from the app. A browser-based GitHub upload would require exposing a writable GitHub token to guests, which is not safe.
 
+For a free cloud-ish backup, deploy a Google Apps Script web app that accepts a plain-text JSON POST with `fileName`, `mimeType`, and `dataUrl`, writes the decoded image to Drive, then paste that web app URL into the admin screen. Open the app with `?admin=1` on the iPad, set the Webhook URL, and future photos will save locally first and then post to the webhook in the background.
+
 ## Sharing
 
 On iPad Safari, the Share button uses the native iOS share sheet when available. Guests can AirDrop, save, message, or email from there. If file sharing is unavailable, use Download.

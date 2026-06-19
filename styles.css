@@ -18,6 +18,7 @@ html,
 body {
   height: 100%;
   margin: 0;
+  overflow: hidden;
 }
 
 body {
@@ -28,15 +29,18 @@ body {
   background-size: 18px 18px;
   color: var(--ink);
   font-family: "Courier New", Courier, monospace;
-  overflow: hidden;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
 
 .booth {
-  min-height: 100svh;
+  position: fixed;
+  inset: 0;
+  height: 100vh;
+  max-height: 100%;
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
+  background: var(--paper);
 }
 
 .stage {
@@ -119,23 +123,14 @@ body {
 
 .booth-logo {
   position: absolute;
-  left: max(14px, env(safe-area-inset-left));
-  top: 14px;
-  padding: 8px 10px;
-  border: 3px solid var(--paper);
-  background: var(--line);
-  color: var(--paper);
-  font-size: clamp(16px, 2.7vw, 30px);
-  font-weight: 900;
-  line-height: 0.9;
-  text-transform: uppercase;
-  transform: rotate(1.5deg);
-  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.3);
-}
-
-.booth-logo span {
-  display: block;
-  color: #f1c64b;
+  right: max(18px, env(safe-area-inset-right));
+  bottom: calc(max(18px, env(safe-area-inset-bottom)) + 132px);
+  color: rgba(244, 239, 226, 0.88);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(18px, 2.7vw, 34px);
+  font-style: italic;
+  letter-spacing: 0;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
 }
 
 .editable-sticker {
@@ -201,11 +196,12 @@ body {
 .tap-to-start {
   position: absolute;
   left: 50%;
-  bottom: 116px;
+  top: 50%;
+  bottom: auto;
   z-index: 3;
   min-height: 46px;
   padding: 0 14px;
-  transform: translateX(-50%) rotate(-1deg);
+  transform: translate(-50%, -50%) rotate(-1deg);
 }
 
 .tap-to-start.hidden {
@@ -281,7 +277,8 @@ body {
 }
 
 .controls {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 9px;
   padding: 10px max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
   border-top: 6px solid var(--line);
@@ -327,8 +324,11 @@ body {
 }
 
 .share-row {
+  display: grid;
+  grid-template-columns: 1fr;
   align-self: end;
   margin-top: auto;
+  width: 100%;
 }
 
 button,
@@ -445,7 +445,9 @@ button:disabled,
 }
 
 .chip-row.stickers {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 .chip {
@@ -457,7 +459,19 @@ button:disabled,
 }
 
 .stickers .chip {
+  flex: 1 1 auto;
+  min-width: 54px;
   min-height: 42px;
+  padding: 0 10px;
+  transform: rotate(-1deg);
+}
+
+.stickers .chip:nth-child(2n) {
+  transform: rotate(1deg);
+}
+
+.stickers .chip:nth-child(3n) {
+  transform: rotate(-2deg);
 }
 
 .chip.selected {
@@ -482,6 +496,30 @@ button:disabled,
   padding: 8px;
   border: 3px dashed var(--line);
   background: #fff;
+}
+
+.webhook-field {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 4px;
+}
+
+.webhook-field span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.webhook-field input {
+  min-width: 0;
+  min-height: 40px;
+  border: 3px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  padding: 0 8px;
 }
 
 .admin-panel span {
@@ -530,6 +568,7 @@ button:disabled,
   }
 
   .controls {
+    height: 100%;
     align-content: center;
     border-top: 0;
     border-left: 6px solid var(--line);
