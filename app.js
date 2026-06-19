@@ -10,15 +10,15 @@ const els = {
   countdown: document.getElementById("countdown"),
   tapToStart: document.getElementById("tapToStart"),
   startCamera: document.getElementById("startCamera"),
+  refreshApp: document.getElementById("refreshApp"),
   timer: document.getElementById("timer"),
-  ringLight: document.getElementById("ringLight"),
+  ringLightButton: document.getElementById("ringLightButton"),
   logoOverlay: document.getElementById("logoOverlay"),
   rotateSticker: document.getElementById("rotateSticker"),
   removeSticker: document.getElementById("removeSticker"),
   takePhoto: document.getElementById("takePhoto"),
   recordVideo: document.getElementById("recordVideo"),
   shareCapture: document.getElementById("shareCapture"),
-  downloadCapture: document.getElementById("downloadCapture"),
   clearCapture: document.getElementById("clearCapture"),
   adminPanel: document.getElementById("adminPanel"),
   exportArchive: document.getElementById("exportArchive"),
@@ -57,9 +57,6 @@ function setBusy(nextBusy) {
   els.shareCapture.disabled = busy || !hasCapture;
   els.clearCapture.disabled = busy || !hasCapture;
   els.startCamera.disabled = busy;
-
-  els.downloadCapture.classList.toggle("disabled", busy || !hasCapture);
-  els.downloadCapture.setAttribute("aria-disabled", String(busy || !hasCapture));
 }
 
 function clearCapture() {
@@ -67,8 +64,6 @@ function clearCapture() {
   currentCapture = null;
   els.result.replaceChildren();
   els.result.classList.add("hidden");
-  els.downloadCapture.removeAttribute("href");
-  els.downloadCapture.removeAttribute("download");
   setBusy(false);
 }
 
@@ -132,9 +127,7 @@ function showCapture(blob, type) {
 
   els.result.replaceChildren(media);
   els.result.classList.remove("hidden");
-  els.downloadCapture.href = url;
-  els.downloadCapture.download = fileName;
-  setStatus(type === "photo" ? "Saved. Share or download." : "Video ready.");
+  setStatus(type === "photo" ? "Saved. Share with AirDrop." : "Video ready.");
   setBusy(false);
 }
 
@@ -151,9 +144,18 @@ async function takePhoto() {
   canvas.height = video.videoHeight || 720;
 
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const captureFilter = filterForCanvas(selectedFilter);
+  ctx.save();
+  ctx.filter = captureFilter;
+  const canvasFilterApplied = ctx.filter === captureFilter;
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-  applyCanvasFilter(ctx, canvas.width, canvas.height, selectedFilter);
+  ctx.restore();
+  if (captureFilter !== "none" && !canvasFilterApplied) {
+    // If a browser ignored canvas filters, the fallback keeps saved photos from being unfiltered.
+    applyCanvasFilter(ctx, canvas.width, canvas.height, selectedFilter);
+  }
   drawPhotoOverlays(ctx, canvas.width, canvas.height);
+  setRingLight(false);
 
   canvas.toBlob(async (blob) => {
     if (!blob) {
@@ -187,6 +189,7 @@ async function recordVideo() {
 
   recorder.start();
   els.recordVideo.textContent = "Stop";
+  els.recordVideo.classList.add("recording");
   els.recordVideo.disabled = false;
   setStatus("Recording. Tap Stop when done.");
 }
@@ -194,6 +197,7 @@ async function recordVideo() {
 function stopVideo() {
   if (!recorder) return;
   els.recordVideo.textContent = "Video";
+  els.recordVideo.classList.remove("recording");
   recorder.stop();
   setBusy(true);
   setStatus("Saving video.");
@@ -235,6 +239,19 @@ function setFilter(filterName, button) {
   selectedFilter = filterName;
   els.booth.dataset.filter = selectedFilter;
   setSelected("[data-filter-choice]", button);
+}
+
+function setRingLight(enabled) {
+  els.booth.dataset.ring = enabled ? "on" : "off";
+  els.ringLightButton.setAttribute("aria-pressed", String(enabled));
+}
+
+function toggleRingLight() {
+  setRingLight(els.booth.dataset.ring !== "on");
+}
+
+function refreshApp() {
+  location.reload();
 }
 
 function addSticker(kind) {
@@ -427,6 +444,17 @@ function applyCanvasFilter(ctx, width, height, filterName) {
     data[i + 2] = clampByte(b);
   }
   ctx.putImageData(imageData, 0, 0);
+}
+
+function filterForCanvas(filterName) {
+  if (filterName === "warm") return "sepia(0.3) saturate(1.15) contrast(1.08)";
+  if (filterName === "flash") return "brightness(1.16) contrast(1.22) saturate(1.1)";
+  if (filterName === "mono") return "grayscale(1) contrast(1.22)";
+  if (filterName === "acid") return "hue-rotate(95deg) saturate(2.2) contrast(1.28)";
+  if (filterName === "disco") return "hue-rotate(250deg) saturate(2.3) contrast(1.2) brightness(1.06)";
+  if (filterName === "dream") return "sepia(0.2) saturate(1.55) hue-rotate(318deg) brightness(1.1)";
+  if (filterName === "vhs") return "contrast(1.36) saturate(1.65) hue-rotate(180deg)";
+  return "none";
 }
 
 function drawPhotoOverlays(ctx, width, height) {
@@ -643,6 +671,7 @@ function normalizeDegrees(value) {
 }
 
 els.startCamera.addEventListener("click", startCamera);
+els.refreshApp.addEventListener("click", refreshApp);
 els.tapToStart.addEventListener("click", startCamera);
 els.stage.addEventListener("click", (event) => {
   if (!stream && event.target === els.camera) startCamera();
@@ -657,9 +686,7 @@ els.clearCapture.addEventListener("click", () => {
   setStatus("Ready.");
 });
 els.shareCapture.addEventListener("click", shareCapture);
-els.ringLight.addEventListener("change", () => {
-  els.booth.dataset.ring = els.ringLight.checked ? "on" : "off";
-});
+els.ringLightButton.addEventListener("click", toggleRingLight);
 els.logoOverlay.addEventListener("change", () => {
   els.booth.dataset.logo = els.logoOverlay.checked ? "on" : "off";
 });

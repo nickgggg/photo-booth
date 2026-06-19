@@ -13,9 +13,9 @@ Camera access requires HTTPS or localhost. GitHub Pages gives you HTTPS for free
 
 ## Owner archive
 
-Every photo is silently saved to local IndexedDB on the iPad after capture. Guests do not see a gallery, and Retake only clears the guest preview; it does not remove the owner archive.
+Every photo is silently saved to local IndexedDB inside this web app on the iPad after capture. This is not the iOS Photos app, so saved photos will not appear in Photos automatically. Guests do not see a gallery, and Retake only clears the guest preview; it does not remove the owner archive.
 
-To export saved photos, open the app with `?admin=1` at the end of the URL and use Export Saved Photos. This is local-only and free. Cloud backup would require adding a backend or a service account flow.
+To export saved photos, open the app on the same iPad with `?admin=1` at the end of the URL and use Export Saved Photos. This is local-only and free. Cloud backup would require adding a backend or a service account flow.
 
 ## Sharing
 

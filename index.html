@@ -26,6 +26,13 @@
         </div>
         <div id="result" class="result hidden" aria-live="polite"></div>
         <div id="countdown" class="countdown hidden" aria-live="assertive"></div>
+        <button id="ringLightButton" class="stage-light" type="button" aria-label="Toggle ring light">⚡</button>
+        <div class="stage-capture">
+          <button id="takePhoto" class="shutter photo-shutter" type="button" disabled aria-label="Take photo"></button>
+          <button id="recordVideo" class="shutter video-shutter" type="button" disabled aria-label="Record video">
+            <span></span>
+          </button>
+        </div>
         <button id="tapToStart" class="tap-to-start" type="button">Tap Camera To Start</button>
       </section>
 
@@ -35,8 +42,11 @@
           <strong>BRICK 2026</strong>
         </div>
 
-        <div class="top-row">
+        <div class="control-section">
+          <div class="mini-label">Session</div>
+          <div class="top-row">
           <button id="startCamera" class="primary" type="button">Start</button>
+          <button id="refreshApp" type="button">Refresh</button>
           <label class="field">
             <span>Timer</span>
             <select id="timer">
@@ -46,13 +56,10 @@
               <option value="10">10</option>
             </select>
           </label>
-          <label class="toggle">
-            <input id="ringLight" type="checkbox">
-            <span>Light</span>
-          </label>
+          </div>
         </div>
 
-        <div class="overlay-panel">
+        <div class="control-section overlay-panel">
           <div class="mini-label">Filter</div>
           <div class="chip-row filters" role="group" aria-label="Filter">
             <button class="chip selected" type="button" data-filter-choice="none">Clean</button>
@@ -83,20 +90,15 @@
           </div>
         </div>
 
-        <div class="capture-row">
-          <button id="takePhoto" class="primary" type="button" disabled>Photo</button>
-          <button id="recordVideo" type="button" disabled>Video</button>
-        </div>
-
-        <div class="share-row">
+        <div class="control-section share-row">
           <button id="shareCapture" type="button" disabled>Share</button>
-          <a id="downloadCapture" class="button disabled" href="#" download aria-disabled="true">Download</a>
           <button id="clearCapture" type="button" disabled>Retake</button>
         </div>
 
         <div id="adminPanel" class="admin-panel hidden">
           <button id="exportArchive" type="button">Export Saved Photos</button>
           <span id="archiveCount">0 saved</span>
+          <small>Saved inside this web app on this iPad. Export to move into Photos/files.</small>
         </div>
 
         <p id="status" class="status">Tap Start, or tap the camera area.</p>
