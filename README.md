@@ -17,6 +17,8 @@ Every photo is silently saved to local IndexedDB inside this web app on the iPad
 
 To export saved photos, open the app on the same iPad with `?admin=1` at the end of the URL and use Export Saved Photos. This is local-only and free. Cloud backup would require adding a backend or a service account flow.
 
+GitHub Pages cannot receive automatic background uploads from the app. A browser-based GitHub upload would require exposing a writable GitHub token to guests, which is not safe.
+
 ## Sharing
 
 On iPad Safari, the Share button uses the native iOS share sheet when available. Guests can AirDrop, save, message, or email from there. If file sharing is unavailable, use Download.

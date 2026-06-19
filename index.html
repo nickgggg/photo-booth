@@ -28,9 +28,9 @@
         <div id="countdown" class="countdown hidden" aria-live="assertive"></div>
         <button id="ringLightButton" class="stage-light" type="button" aria-label="Toggle ring light">⚡</button>
         <div class="stage-capture">
-          <button id="takePhoto" class="shutter photo-shutter" type="button" disabled aria-label="Take photo"></button>
+          <button id="takePhoto" class="shutter photo-shutter" type="button" disabled aria-label="Take photo">📷</button>
           <button id="recordVideo" class="shutter video-shutter" type="button" disabled aria-label="Record video">
-            <span></span>
+            🎥
           </button>
         </div>
         <button id="tapToStart" class="tap-to-start" type="button">Tap Camera To Start</button>
@@ -45,18 +45,22 @@
         <div class="control-section">
           <div class="mini-label">Session</div>
           <div class="top-row">
-          <button id="startCamera" class="primary" type="button">Start</button>
-          <button id="refreshApp" type="button">Refresh</button>
-          <label class="field">
-            <span>Timer</span>
+            <button id="startCamera" class="primary" type="button">Camera</button>
+            <button id="refreshApp" type="button">Refresh</button>
+          </div>
+        </div>
+
+        <div class="control-section">
+          <div class="mini-label">Timer</div>
+          <label class="field wheel-field">
+            <span>iOS opens this as a wheel</span>
             <select id="timer">
               <option value="0">Off</option>
-              <option value="3" selected>3</option>
-              <option value="5">5</option>
-              <option value="10">10</option>
+              <option value="3" selected>3 seconds</option>
+              <option value="5">5 seconds</option>
+              <option value="10">10 seconds</option>
             </select>
           </label>
-          </div>
         </div>
 
         <div class="control-section overlay-panel">
@@ -71,13 +75,19 @@
             <button class="chip" type="button" data-filter-choice="dream">Dream</button>
             <button class="chip" type="button" data-filter-choice="vhs">VHS</button>
           </div>
+        </div>
 
+        <div class="control-section overlay-panel">
           <div class="mini-label">Add Sticker</div>
           <div class="chip-row stickers" role="group" aria-label="Add sticker">
             <button class="chip" type="button" data-sticker-choice="norbit">NORBITLUVR</button>
             <button class="chip" type="button" data-sticker-choice="brickdup">BRICKDUP</button>
             <button class="chip" type="button" data-sticker-choice="congrats">CONGRATS</button>
             <button class="chip emoji-chip" type="button" data-sticker-choice="diamond">💎</button>
+            <button class="chip emoji-chip" type="button" data-sticker-choice="ring">💍</button>
+            <button class="chip emoji-chip" type="button" data-sticker-choice="taco">🌮</button>
+            <button class="chip emoji-chip" type="button" data-sticker-choice="married">💒</button>
+            <button class="chip emoji-chip" type="button" data-sticker-choice="horsefart">🐎💨</button>
           </div>
 
           <div class="sticker-tools">
@@ -90,11 +100,6 @@
           </div>
         </div>
 
-        <div class="control-section share-row">
-          <button id="shareCapture" type="button" disabled>Share</button>
-          <button id="clearCapture" type="button" disabled>Retake</button>
-        </div>
-
         <div id="adminPanel" class="admin-panel hidden">
           <button id="exportArchive" type="button">Export Saved Photos</button>
           <span id="archiveCount">0 saved</span>
@@ -102,6 +107,10 @@
         </div>
 
         <p id="status" class="status">Tap Start, or tap the camera area.</p>
+
+        <div class="control-section share-row">
+          <button id="shareCapture" type="button" disabled>Share</button>
+        </div>
       </section>
     </main>
 

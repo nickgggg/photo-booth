@@ -19,7 +19,6 @@ const els = {
   takePhoto: document.getElementById("takePhoto"),
   recordVideo: document.getElementById("recordVideo"),
   shareCapture: document.getElementById("shareCapture"),
-  clearCapture: document.getElementById("clearCapture"),
   adminPanel: document.getElementById("adminPanel"),
   exportArchive: document.getElementById("exportArchive"),
   archiveCount: document.getElementById("archiveCount"),
@@ -41,6 +40,7 @@ let stickers = [];
 let selectedStickerId = null;
 let nextStickerId = 1;
 let dbPromise = null;
+let orientationRestartTimer = null;
 const activePointers = new Map();
 let gesture = null;
 
@@ -55,8 +55,7 @@ function setBusy(nextBusy) {
   els.takePhoto.disabled = busy || !hasCamera;
   els.recordVideo.disabled = busy || !hasCamera || !window.MediaRecorder;
   els.shareCapture.disabled = busy || !hasCapture;
-  els.clearCapture.disabled = busy || !hasCapture;
-  els.startCamera.disabled = busy;
+  els.startCamera.disabled = busy || hasCamera;
 }
 
 function clearCapture() {
@@ -86,13 +85,27 @@ async function startCamera() {
     els.camera.srcObject = stream;
     await els.camera.play();
     els.tapToStart.classList.add("hidden");
-    els.startCamera.textContent = "Restart";
+    els.startCamera.textContent = "Camera On";
+    els.startCamera.disabled = true;
     setStatus(window.MediaRecorder ? "Ready." : "Ready for photos. Video is not supported here.");
   } catch (error) {
     setStatus("Camera blocked. Use HTTPS and allow camera access.");
   } finally {
     setBusy(false);
+    if (stream) els.startCamera.disabled = true;
   }
+}
+
+function restartCameraForOrientation() {
+  if (!stream || busy) return;
+  clearTimeout(orientationRestartTimer);
+  orientationRestartTimer = setTimeout(() => {
+    startCamera().then(() => {
+      setStatus("Camera adjusted.");
+    }).catch(() => {
+      setStatus("Use Refresh if camera looks wrong.");
+    });
+  }, 350);
 }
 
 async function runTimer() {
@@ -232,7 +245,7 @@ async function shareCapture() {
     }
   }
 
-  setStatus("Use Download on this device.");
+  setStatus("Share unavailable on this device.");
 }
 
 function setFilter(filterName, button) {
@@ -264,7 +277,7 @@ function addSticker(kind) {
     fill: stickerFill(kind),
     x: 0.5 + countOffset * 0.04,
     y: 0.46 + countOffset * 0.04,
-    scale: kind === "diamond" ? 0.78 : 0.72,
+    scale: emojiSticker(kind) ? 0.72 : 0.72,
     rotation: countOffset % 2 ? 4 : -4
   };
   nextStickerId += 1;
@@ -278,7 +291,7 @@ function renderStickers() {
   els.stickersLayer.replaceChildren();
   stickers.forEach((sticker) => {
     const node = document.createElement("div");
-    node.className = `editable-sticker${sticker.kind === "diamond" ? " diamond" : ""}${sticker.id === selectedStickerId ? " selected" : ""}`;
+    node.className = `editable-sticker${emojiSticker(sticker.kind) ? " diamond" : ""}${sticker.id === selectedStickerId ? " selected" : ""}`;
     node.dataset.stickerId = String(sticker.id);
     node.textContent = sticker.text;
     node.style.background = sticker.fill;
@@ -492,13 +505,13 @@ function drawLogo(ctx, width, scale) {
 
 function drawSticker(ctx, sticker, centerX, centerY, baseScale) {
   const scale = baseScale * sticker.scale;
-  const isDiamond = sticker.kind === "diamond";
-  const paddingX = (isDiamond ? 12 : 16) * scale;
+  const isEmoji = emojiSticker(sticker.kind);
+  const paddingX = (isEmoji ? 12 : 16) * scale;
   ctx.save();
-  ctx.font = `${isDiamond ? 74 * scale : 34 * scale}px Arial, Helvetica, sans-serif`;
+  ctx.font = `${isEmoji ? 74 * scale : 34 * scale}px Arial, Helvetica, sans-serif`;
   const metrics = ctx.measureText(sticker.text);
   const width = metrics.width + paddingX * 2;
-  const height = (isDiamond ? 94 : 56) * scale;
+  const height = (isEmoji ? 94 : 56) * scale;
   ctx.translate(centerX, centerY);
   ctx.rotate((sticker.rotation * Math.PI) / 180);
   ctx.fillStyle = sticker.fill;
@@ -510,7 +523,7 @@ function drawSticker(ctx, sticker, centerX, centerY, baseScale) {
   ctx.fillStyle = "#171310";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(sticker.text, 0, isDiamond ? 0 : 2 * scale);
+  ctx.fillText(sticker.text, 0, isEmoji ? 0 : 2 * scale);
   ctx.restore();
 }
 
@@ -549,14 +562,22 @@ function stickerText(kind) {
   if (kind === "brickdup") return "BRICKDUP";
   if (kind === "congrats") return "CONGRATS";
   if (kind === "diamond") return "💎";
+  if (kind === "ring") return "💍";
+  if (kind === "taco") return "🌮";
+  if (kind === "married") return "💒";
+  if (kind === "horsefart") return "🐎💨";
   return "";
 }
 
 function stickerFill(kind) {
   if (kind === "brickdup") return "#d8ecf0";
   if (kind === "congrats") return "#f2b6a7";
-  if (kind === "diamond") return "#d8ecf0";
+  if (emojiSticker(kind)) return "#d8ecf0";
   return "#f1c64b";
+}
+
+function emojiSticker(kind) {
+  return ["diamond", "ring", "taco", "married", "horsefart"].includes(kind);
 }
 
 function setSelected(selector, selectedButton) {
@@ -681,10 +702,6 @@ els.recordVideo.addEventListener("click", () => {
   if (recorder && recorder.state === "recording") stopVideo();
   else recordVideo();
 });
-els.clearCapture.addEventListener("click", () => {
-  clearCapture();
-  setStatus("Ready.");
-});
 els.shareCapture.addEventListener("click", shareCapture);
 els.ringLightButton.addEventListener("click", toggleRingLight);
 els.logoOverlay.addEventListener("change", () => {
@@ -701,6 +718,8 @@ els.removeSticker.addEventListener("click", removeSelectedSticker);
 window.addEventListener("pointermove", moveStickerGesture);
 window.addEventListener("pointerup", endStickerGesture);
 window.addEventListener("pointercancel", endStickerGesture);
+window.addEventListener("orientationchange", restartCameraForOrientation);
+window.addEventListener("resize", restartCameraForOrientation);
 window.addEventListener("pagehide", () => {
   clearCapture();
   if (stream) stream.getTracks().forEach((track) => track.stop());
