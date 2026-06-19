@@ -12,6 +12,8 @@ const els = {
   startCamera: document.getElementById("startCamera"),
   refreshApp: document.getElementById("refreshApp"),
   timer: document.getElementById("timer"),
+  rotateCameraLeft: document.getElementById("rotateCameraLeft"),
+  rotateCameraRight: document.getElementById("rotateCameraRight"),
   ringLightButton: document.getElementById("ringLightButton"),
   logoOverlay: document.getElementById("logoOverlay"),
   rotateSticker: document.getElementById("rotateSticker"),
@@ -44,6 +46,7 @@ let selectedStickerId = null;
 let nextStickerId = 1;
 let dbPromise = null;
 let orientationRestartTimer = null;
+let cameraRotation = 0;
 const activePointers = new Map();
 let gesture = null;
 
@@ -282,6 +285,11 @@ function toggleRingLight() {
 
 function refreshApp() {
   location.reload();
+}
+
+function rotateCamera(degrees) {
+  cameraRotation = normalizeDegrees(cameraRotation + degrees);
+  els.booth.style.setProperty("--camera-rotation", `${cameraRotation}deg`);
 }
 
 function addSticker(kind) {
@@ -755,6 +763,8 @@ function normalizeDegrees(value) {
 
 els.startCamera.addEventListener("click", startCamera);
 els.refreshApp.addEventListener("click", refreshApp);
+els.rotateCameraLeft.addEventListener("click", () => rotateCamera(-90));
+els.rotateCameraRight.addEventListener("click", () => rotateCamera(90));
 els.tapToStart.addEventListener("click", startCamera);
 els.stage.addEventListener("click", (event) => {
   if (!stream && event.target === els.camera) startCamera();
@@ -799,3 +809,4 @@ if (isAdmin) {
 }
 
 setBusy(false);
+els.booth.style.setProperty("--camera-rotation", "0deg");

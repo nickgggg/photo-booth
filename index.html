@@ -45,7 +45,7 @@
         <div class="control-section">
           <div class="mini-label">Session</div>
           <div class="top-row">
-            <button id="startCamera" class="primary" type="button">Camera</button>
+            <button id="startCamera" class="primary" type="button">Turn On Camera</button>
             <button id="refreshApp" type="button">Refresh</button>
           </div>
         </div>
@@ -53,7 +53,7 @@
         <div class="control-section">
           <div class="mini-label">Timer</div>
           <label class="field wheel-field">
-            <span>iOS opens this as a wheel</span>
+            <span>Delay before capture</span>
             <select id="timer">
               <option value="0">Off</option>
               <option value="3" selected>3 seconds</option>
@@ -61,6 +61,14 @@
               <option value="10">10 seconds</option>
             </select>
           </label>
+        </div>
+
+        <div class="control-section">
+          <div class="mini-label">Camera Rotate</div>
+          <div class="top-row">
+            <button id="rotateCameraLeft" type="button">-90</button>
+            <button id="rotateCameraRight" type="button">+90</button>
+          </div>
         </div>
 
         <div class="control-section overlay-panel">
@@ -117,7 +125,7 @@
           <small>Saved inside this web app on this iPad. Export to move into Photos/files.</small>
         </div>
 
-        <p id="status" class="status">Tap Start, or tap the camera area.</p>
+        <p id="status" class="status">Turn on camera, then pick a filter or sticker.</p>
 
         <div class="control-section share-row">
           <button id="shareCapture" type="button" disabled>Share</button>

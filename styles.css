@@ -58,6 +58,8 @@ body {
   height: 100%;
   display: block;
   object-fit: contain;
+  transform: rotate(var(--camera-rotation, 0deg));
+  transform-origin: center;
 }
 
 .booth[data-filter="warm"] .camera,
@@ -199,7 +201,7 @@ body {
   top: 50%;
   bottom: auto;
   z-index: 3;
-  min-height: 46px;
+  min-height: 42px;
   padding: 0 14px;
   transform: translate(-50%, -50%) rotate(-1deg);
 }
@@ -286,7 +288,7 @@ body {
 }
 
 .brand-lockup {
-  min-height: 58px;
+  min-height: 48px;
   display: grid;
   align-content: center;
   justify-items: center;
@@ -300,14 +302,14 @@ body {
 
 .brand-lockup span {
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 26px;
+  font-size: 20px;
   font-weight: 900;
   letter-spacing: 0;
 }
 
 .brand-lockup strong {
   color: var(--tape);
-  font-size: 14px;
+  font-size: 11px;
 }
 
 .top-row,
