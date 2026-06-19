@@ -4,58 +4,57 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="BRIXPIX">
+    <meta name="application-name" content="BRIXPIX">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#101112">
-    <title>Wedding Photo Booth</title>
+    <meta name="theme-color" content="#f4efe2">
+    <title>BRIXPIX</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="icons/brixpix-apple-touch-icon.png">
+    <link rel="icon" href="icons/brixpix-icon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
-    <main class="booth" data-ring="off" data-filter="none" data-sticker="none" data-logo="on">
-      <section class="stage" aria-label="Camera preview and capture result">
-        <div class="marquee" aria-hidden="true">
-          <span>brick2026</span>
-          <span>brick2026</span>
-          <span>brick2026</span>
-        </div>
+    <main class="booth" data-ring="off" data-filter="none" data-logo="on">
+      <section id="stage" class="stage" aria-label="Camera preview and capture result">
         <video id="camera" class="camera" autoplay playsinline muted></video>
         <canvas id="snapshot" class="hidden"></canvas>
         <div id="liveOverlays" class="live-overlays">
-          <div class="booth-logo">BRICK<span>2026</span></div>
-          <div id="editableSticker" class="editable-sticker hidden" aria-label="Selected sticker">NORBITLUVR</div>
+          <div class="booth-logo">BRIX<span>PIX</span></div>
+          <div id="stickersLayer" class="stickers-layer" aria-label="Stickers"></div>
         </div>
         <div id="result" class="result hidden" aria-live="polite"></div>
         <div id="countdown" class="countdown hidden" aria-live="assertive"></div>
-        <div class="privacy">Private session. No previous photos are shown.</div>
+        <button id="tapToStart" class="tap-to-start" type="button">Tap Camera To Start</button>
       </section>
 
       <section class="controls" aria-label="Photo booth controls">
         <div class="brand-lockup" aria-hidden="true">
-          <span>BRICK</span>
-          <strong>2026</strong>
+          <span>BRIXPIX</span>
+          <strong>BRICK 2026</strong>
         </div>
 
-        <button id="startCamera" class="primary wide" type="button">Start Camera</button>
-
-        <div class="row">
+        <div class="top-row">
+          <button id="startCamera" class="primary" type="button">Start</button>
           <label class="field">
             <span>Timer</span>
             <select id="timer">
               <option value="0">Off</option>
-              <option value="3" selected>3 sec</option>
-              <option value="5">5 sec</option>
-              <option value="10">10 sec</option>
+              <option value="3" selected>3</option>
+              <option value="5">5</option>
+              <option value="10">10</option>
             </select>
           </label>
-
           <label class="toggle">
             <input id="ringLight" type="checkbox">
-            <span>Ring light</span>
+            <span>Light</span>
           </label>
         </div>
 
         <div class="overlay-panel">
           <div class="mini-label">Filter</div>
-          <div class="chip-row" role="group" aria-label="Filter">
+          <div class="chip-row filters" role="group" aria-label="Filter">
             <button class="chip selected" type="button" data-filter-choice="none">Clean</button>
             <button class="chip" type="button" data-filter-choice="warm">Warm</button>
             <button class="chip" type="button" data-filter-choice="flash">Flash</button>
@@ -66,33 +65,41 @@
             <button class="chip" type="button" data-filter-choice="vhs">VHS</button>
           </div>
 
-          <div class="mini-label">Sticker</div>
-          <div class="chip-row" role="group" aria-label="Sticker">
-            <button class="chip selected" type="button" data-sticker-choice="none">None</button>
+          <div class="mini-label">Add Sticker</div>
+          <div class="chip-row stickers" role="group" aria-label="Add sticker">
             <button class="chip" type="button" data-sticker-choice="norbit">NORBITLUVR</button>
             <button class="chip" type="button" data-sticker-choice="brickdup">BRICKDUP</button>
             <button class="chip" type="button" data-sticker-choice="congrats">CONGRATS</button>
             <button class="chip emoji-chip" type="button" data-sticker-choice="diamond">💎</button>
           </div>
 
-          <label class="toggle compact">
-            <input id="logoOverlay" type="checkbox" checked>
-            <span>Logo</span>
-          </label>
+          <div class="sticker-tools">
+            <button id="rotateSticker" class="tool-button" type="button">Rotate</button>
+            <button id="removeSticker" class="tool-button" type="button">Remove</button>
+            <label class="toggle compact">
+              <input id="logoOverlay" type="checkbox" checked>
+              <span>Logo</span>
+            </label>
+          </div>
         </div>
 
-        <div class="row action-row">
-          <button id="takePhoto" class="primary" type="button" disabled>Take Photo</button>
-          <button id="recordVideo" type="button" disabled>Record Video</button>
+        <div class="capture-row">
+          <button id="takePhoto" class="primary" type="button" disabled>Photo</button>
+          <button id="recordVideo" type="button" disabled>Video</button>
         </div>
 
-        <div class="row">
+        <div class="share-row">
           <button id="shareCapture" type="button" disabled>Share</button>
           <a id="downloadCapture" class="button disabled" href="#" download aria-disabled="true">Download</a>
-          <button id="deleteCapture" class="danger" type="button" disabled>Delete</button>
+          <button id="clearCapture" type="button" disabled>Retake</button>
         </div>
 
-        <p id="status" class="status">Tap Start Camera, allow camera access, then go full screen.</p>
+        <div id="adminPanel" class="admin-panel hidden">
+          <button id="exportArchive" type="button">Export Saved Photos</button>
+          <span id="archiveCount">0 saved</span>
+        </div>
+
+        <p id="status" class="status">Tap Start, or tap the camera area.</p>
       </section>
     </main>
 

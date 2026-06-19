@@ -1,4 +1,4 @@
-# Wedding Photo Booth
+# BRIXPIX
 
 Tiny static photo booth app for an iPad in a fullscreen browser.
 
@@ -7,13 +7,15 @@ Tiny static photo booth app for an iPad in a fullscreen browser.
 1. Put these files in a GitHub repository.
 2. Turn on GitHub Pages for the repository.
 3. Open the GitHub Pages URL in Safari on the iPad.
-4. Tap Share, then Add to Home Screen for a kiosk-like fullscreen launch.
+4. Tap Share, then Add to Home Screen. It launches as `BRIXPIX` with the custom camera icon.
 
 Camera access requires HTTPS or localhost. GitHub Pages gives you HTTPS for free.
 
-## Privacy
+## Owner archive
 
-The app does not keep a gallery, does not upload captures, and does not use browser storage. Each capture lives only in the current browser session until the guest shares, downloads, deletes, refreshes, or leaves the page.
+Every photo is silently saved to local IndexedDB on the iPad after capture. Guests do not see a gallery, and Retake only clears the guest preview; it does not remove the owner archive.
+
+To export saved photos, open the app with `?admin=1` at the end of the URL and use Export Saved Photos. This is local-only and free. Cloud backup would require adding a backend or a service account flow.
 
 ## Sharing
 
@@ -23,9 +25,11 @@ On iPad Safari, the Share button uses the native iOS share sheet when available.
 
 The ring light toggle adds a large soft white screen border. For best results at a wedding booth, use an actual USB/battery ring light too.
 
+Safari web apps cannot set the iPad's system brightness like Apple Wallet can. Apple does not expose that private brightness control to normal websites. Set brightness manually before the event and use Guided Access to keep the app open.
+
 ## Overlays
 
-Guests can pick a filter, add a sticker, drag it around the camera preview, pinch to resize it, and toggle the `brick2026` mark. Photo overlays are burned into downloaded/shared photos. Video overlays appear in the booth preview/playback UI; keeping them burned into videos would require a more complex canvas-recording path and more device testing on iPad Safari.
+Guests can pick a filter, add multiple stickers, drag them around the camera preview, pinch to resize/rotate, and toggle the `BRIXPIX` mark. Photo filters and overlays are burned into downloaded/shared photos. Video uses native browser playback controls for better iOS compatibility.
 
 Mac and iOS camera features such as Center Stage can crop or reframe before the browser receives the video. The app itself uses `object-fit: contain` so it does not add another crop on top.
 

@@ -2,23 +2,34 @@
 
 const els = {
   booth: document.querySelector(".booth"),
+  stage: document.getElementById("stage"),
   camera: document.getElementById("camera"),
   snapshot: document.getElementById("snapshot"),
-  liveOverlays: document.getElementById("liveOverlays"),
-  editableSticker: document.getElementById("editableSticker"),
+  stickersLayer: document.getElementById("stickersLayer"),
   result: document.getElementById("result"),
   countdown: document.getElementById("countdown"),
+  tapToStart: document.getElementById("tapToStart"),
   startCamera: document.getElementById("startCamera"),
   timer: document.getElementById("timer"),
   ringLight: document.getElementById("ringLight"),
   logoOverlay: document.getElementById("logoOverlay"),
+  rotateSticker: document.getElementById("rotateSticker"),
+  removeSticker: document.getElementById("removeSticker"),
   takePhoto: document.getElementById("takePhoto"),
   recordVideo: document.getElementById("recordVideo"),
   shareCapture: document.getElementById("shareCapture"),
   downloadCapture: document.getElementById("downloadCapture"),
-  deleteCapture: document.getElementById("deleteCapture"),
+  clearCapture: document.getElementById("clearCapture"),
+  adminPanel: document.getElementById("adminPanel"),
+  exportArchive: document.getElementById("exportArchive"),
+  archiveCount: document.getElementById("archiveCount"),
   status: document.getElementById("status")
 };
+
+const DB_NAME = "brixpix-archive";
+const DB_VERSION = 1;
+const STORE_NAME = "photos";
+const isAdmin = new URLSearchParams(location.search).has("admin");
 
 let stream = null;
 let recorder = null;
@@ -26,16 +37,12 @@ let chunks = [];
 let currentCapture = null;
 let busy = false;
 let selectedFilter = "none";
-let selectedSticker = "none";
-const stickerState = {
-  x: 0.34,
-  y: 0.24,
-  scale: 1,
-  text: "NORBITLUVR"
-};
+let stickers = [];
+let selectedStickerId = null;
+let nextStickerId = 1;
+let dbPromise = null;
 const activePointers = new Map();
-let dragStart = null;
-let pinchStart = null;
+let gesture = null;
 
 function setStatus(message) {
   els.status.textContent = message;
@@ -48,7 +55,7 @@ function setBusy(nextBusy) {
   els.takePhoto.disabled = busy || !hasCamera;
   els.recordVideo.disabled = busy || !hasCamera || !window.MediaRecorder;
   els.shareCapture.disabled = busy || !hasCapture;
-  els.deleteCapture.disabled = busy || !hasCapture;
+  els.clearCapture.disabled = busy || !hasCapture;
   els.startCamera.disabled = busy;
 
   els.downloadCapture.classList.toggle("disabled", busy || !hasCapture);
@@ -83,10 +90,11 @@ async function startCamera() {
 
     els.camera.srcObject = stream;
     await els.camera.play();
-    els.startCamera.textContent = "Restart Camera";
-    setStatus(window.MediaRecorder ? "Ready." : "Ready for photos. Video recording is not supported in this browser.");
+    els.tapToStart.classList.add("hidden");
+    els.startCamera.textContent = "Restart";
+    setStatus(window.MediaRecorder ? "Ready." : "Ready for photos. Video is not supported here.");
   } catch (error) {
-    setStatus("Camera blocked. Open this over HTTPS or localhost, then allow camera access.");
+    setStatus("Camera blocked. Use HTTPS and allow camera access.");
   } finally {
     setBusy(false);
   }
@@ -108,7 +116,7 @@ function showCapture(blob, type) {
   clearCapture();
 
   const extension = type === "photo" ? "jpg" : videoExtension(blob.type);
-  const fileName = `wedding-booth-${new Date().toISOString().replace(/[:.]/g, "-")}.${extension}`;
+  const fileName = `brixpix-${new Date().toISOString().replace(/[:.]/g, "-")}.${extension}`;
   const url = URL.createObjectURL(blob);
   currentCapture = { blob, fileName, type, url };
 
@@ -118,34 +126,15 @@ function showCapture(blob, type) {
   media.alt = type === "photo" ? "Captured photo" : "";
   if (type === "video") {
     media.controls = true;
-    media.loop = true;
     media.playsInline = true;
     media.preload = "metadata";
   }
 
-  if (type === "video") {
-    const shell = document.createElement("div");
-    shell.className = "video-shell";
-    const playButton = document.createElement("button");
-    playButton.className = "video-play";
-    playButton.type = "button";
-    playButton.setAttribute("aria-label", "Play video");
-    playButton.innerHTML = "<span></span>";
-    playButton.addEventListener("click", () => {
-      if (media.paused) media.play();
-      else media.pause();
-    });
-    media.addEventListener("play", () => playButton.classList.add("hidden"));
-    media.addEventListener("pause", () => playButton.classList.remove("hidden"));
-    shell.append(media, playButton);
-    els.result.replaceChildren(shell, cloneLiveOverlays());
-  } else {
-    els.result.replaceChildren(media);
-  }
+  els.result.replaceChildren(media);
   els.result.classList.remove("hidden");
   els.downloadCapture.href = url;
   els.downloadCapture.download = fileName;
-  setStatus("Captured. Share, download, or delete before the next guest.");
+  setStatus(type === "photo" ? "Saved. Share or download." : "Video ready.");
   setBusy(false);
 }
 
@@ -160,18 +149,19 @@ async function takePhoto() {
   const canvas = els.snapshot;
   canvas.width = video.videoWidth || 1280;
   canvas.height = video.videoHeight || 720;
-  const ctx = canvas.getContext("2d");
-  ctx.filter = filterForCanvas(selectedFilter);
+
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-  ctx.filter = "none";
+  applyCanvasFilter(ctx, canvas.width, canvas.height, selectedFilter);
   drawPhotoOverlays(ctx, canvas.width, canvas.height);
 
-  canvas.toBlob((blob) => {
+  canvas.toBlob(async (blob) => {
     if (!blob) {
       setStatus("Photo failed. Try again.");
       setBusy(false);
       return;
     }
+    await archivePhoto(blob);
     showCapture(blob, "photo");
   }, "image/jpeg", 0.92);
 }
@@ -196,14 +186,14 @@ async function recordVideo() {
   };
 
   recorder.start();
-  els.recordVideo.textContent = "Stop Video";
+  els.recordVideo.textContent = "Stop";
   els.recordVideo.disabled = false;
-  setStatus("Recording. Tap Stop Video when done.");
+  setStatus("Recording. Tap Stop when done.");
 }
 
 function stopVideo() {
   if (!recorder) return;
-  els.recordVideo.textContent = "Record Video";
+  els.recordVideo.textContent = "Video";
   recorder.stop();
   setBusy(true);
   setStatus("Saving video.");
@@ -227,8 +217,8 @@ async function shareCapture() {
     try {
       await navigator.share({
         files: [file],
-        title: "Wedding photo booth",
-        text: "Thanks for celebrating with us!"
+        title: "BRIXPIX",
+        text: "BRICK 2026"
       });
       setStatus("Shared.");
       return;
@@ -238,234 +228,112 @@ async function shareCapture() {
     }
   }
 
-  if (navigator.share) {
-    try {
-      await navigator.share({
-        title: "Wedding photo booth",
-        text: "Download your capture from this booth."
-      });
-      return;
-    } catch (error) {
-      setStatus("Share canceled.");
-      return;
-    }
-  }
-
-  setStatus("Sharing files is not available here. Use Download.");
+  setStatus("Use Download on this device.");
 }
 
-els.startCamera.addEventListener("click", startCamera);
-els.takePhoto.addEventListener("click", takePhoto);
-els.recordVideo.addEventListener("click", () => {
-  if (recorder && recorder.state === "recording") stopVideo();
-  else recordVideo();
-});
-els.deleteCapture.addEventListener("click", () => {
-  clearCapture();
-  setStatus("Deleted. Ready for the next guest.");
-});
-els.shareCapture.addEventListener("click", shareCapture);
-els.ringLight.addEventListener("change", () => {
-  els.booth.dataset.ring = els.ringLight.checked ? "on" : "off";
-});
-els.logoOverlay.addEventListener("change", () => {
-  els.booth.dataset.logo = els.logoOverlay.checked ? "on" : "off";
-});
-document.querySelectorAll("[data-filter-choice]").forEach((button) => {
-  button.addEventListener("click", () => {
-    selectedFilter = button.dataset.filterChoice;
-    els.booth.dataset.filter = selectedFilter;
-    setSelected("[data-filter-choice]", button);
-  });
-});
-document.querySelectorAll("[data-sticker-choice]").forEach((button) => {
-  button.addEventListener("click", () => {
-    selectedSticker = button.dataset.stickerChoice;
-    stickerState.text = stickerText(selectedSticker);
-    els.booth.dataset.sticker = selectedSticker;
-    setSelected("[data-sticker-choice]", button);
-    updateSticker();
-  });
-});
-els.editableSticker.addEventListener("pointerdown", startStickerGesture);
-window.addEventListener("pointermove", moveStickerGesture);
-window.addEventListener("pointerup", endStickerGesture);
-window.addEventListener("pointercancel", endStickerGesture);
-
-window.addEventListener("pagehide", () => {
-  clearCapture();
-  if (stream) stream.getTracks().forEach((track) => track.stop());
-});
-
-setBusy(false);
-updateSticker();
-
-function cloneLiveOverlays() {
-  const overlays = document.getElementById("liveOverlays").cloneNode(true);
-  overlays.id = "";
-  overlays.querySelectorAll("[id]").forEach((node) => {
-    node.removeAttribute("id");
-  });
-  overlays.className = "capture-overlays";
-  return overlays;
+function setFilter(filterName, button) {
+  selectedFilter = filterName;
+  els.booth.dataset.filter = selectedFilter;
+  setSelected("[data-filter-choice]", button);
 }
 
-function filterForCanvas(filterName) {
-  if (filterName === "warm") return "sepia(0.24) saturate(1.18) contrast(1.04)";
-  if (filterName === "flash") return "brightness(1.12) contrast(1.16) saturate(1.22)";
-  if (filterName === "mono") return "grayscale(1) contrast(1.18)";
-  if (filterName === "acid") return "hue-rotate(105deg) saturate(2.6) contrast(1.35)";
-  if (filterName === "disco") return "hue-rotate(245deg) saturate(3) contrast(1.18) brightness(1.08)";
-  if (filterName === "dream") return "sepia(0.18) saturate(1.9) hue-rotate(310deg) brightness(1.18) blur(0.5px)";
-  if (filterName === "vhs") return "contrast(1.45) saturate(1.8) hue-rotate(185deg)";
-  return "none";
+function addSticker(kind) {
+  const stageRect = els.stage.getBoundingClientRect();
+  const countOffset = stickers.length % 4;
+  const sticker = {
+    id: nextStickerId,
+    kind,
+    text: stickerText(kind),
+    fill: stickerFill(kind),
+    x: 0.5 + countOffset * 0.04,
+    y: 0.46 + countOffset * 0.04,
+    scale: kind === "diamond" ? 0.78 : 0.72,
+    rotation: countOffset % 2 ? 4 : -4
+  };
+  nextStickerId += 1;
+  stickers.push(sticker);
+  selectedStickerId = sticker.id;
+  renderStickers();
+  setStatus(stageRect.width ? "Drag sticker. Pinch to resize/rotate." : "Sticker added.");
 }
 
-function drawPhotoOverlays(ctx, width, height) {
-  const scale = Math.max(1, width / 1280);
-  if (els.logoOverlay.checked) drawLogo(ctx, width, scale);
-  if (selectedSticker !== "none") {
-    const point = stickerCanvasPoint(width, height);
-    drawSticker(ctx, stickerState.text, point.x, point.y, -0.07, stickerFill(), scale * stickerState.scale);
-  }
-}
-
-function drawLogo(ctx, width, scale) {
-  const boxWidth = 174 * scale;
-  const boxHeight = 82 * scale;
-  const x = width - boxWidth - 34 * scale;
-  const y = 54 * scale;
-  ctx.save();
-  ctx.translate(x + boxWidth / 2, y + boxHeight / 2);
-  ctx.rotate(0.035);
-  ctx.fillStyle = "#d7356b";
-  ctx.strokeStyle = "#fff7dd";
-  ctx.lineWidth = 6 * scale;
-  roundedRect(ctx, -boxWidth / 2, -boxHeight / 2, boxWidth, boxHeight, 12 * scale);
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = "#fff7dd";
-  ctx.font = `${28 * scale}px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText("BRICK", 0, -13 * scale);
-  ctx.fillStyle = "#ffe777";
-  ctx.fillText("2026", 0, 19 * scale);
-  ctx.restore();
-}
-
-function drawSticker(ctx, text, centerX, centerY, rotation, fill, scale) {
-  const paddingX = 18 * scale;
-  const paddingY = 12 * scale;
-  ctx.save();
-  const isDiamond = text === "💎";
-  ctx.font = `${isDiamond ? 74 * scale : 34 * scale}px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif`;
-  const metrics = ctx.measureText(text);
-  const width = metrics.width + paddingX * 2;
-  const height = (isDiamond ? 94 : 58) * scale;
-  ctx.translate(centerX, centerY);
-  ctx.rotate(rotation);
-  ctx.fillStyle = fill;
-  ctx.strokeStyle = "#221719";
-  ctx.lineWidth = 5 * scale;
-  roundedRect(ctx, -width / 2, -height / 2, width, height, 10 * scale);
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = "#221719";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(text, 0, 3 * scale);
-  ctx.restore();
-}
-
-function roundedRect(ctx, x, y, width, height, radius) {
-  ctx.beginPath();
-  ctx.moveTo(x + radius, y);
-  ctx.arcTo(x + width, y, x + width, y + height, radius);
-  ctx.arcTo(x + width, y + height, x, y + height, radius);
-  ctx.arcTo(x, y + height, x, y, radius);
-  ctx.arcTo(x, y, x + width, y, radius);
-  ctx.closePath();
-}
-
-function setSelected(selector, selectedButton) {
-  document.querySelectorAll(selector).forEach((button) => {
-    button.classList.toggle("selected", button === selectedButton);
+function renderStickers() {
+  els.stickersLayer.replaceChildren();
+  stickers.forEach((sticker) => {
+    const node = document.createElement("div");
+    node.className = `editable-sticker${sticker.kind === "diamond" ? " diamond" : ""}${sticker.id === selectedStickerId ? " selected" : ""}`;
+    node.dataset.stickerId = String(sticker.id);
+    node.textContent = sticker.text;
+    node.style.background = sticker.fill;
+    node.style.setProperty("--sticker-x", `${sticker.x * 100}%`);
+    node.style.setProperty("--sticker-y", `${sticker.y * 100}%`);
+    node.style.setProperty("--sticker-scale", String(sticker.scale));
+    node.style.setProperty("--sticker-rotation", `${sticker.rotation}deg`);
+    node.addEventListener("pointerdown", startStickerGesture);
+    els.stickersLayer.append(node);
   });
 }
 
-function stickerText(value) {
-  if (value === "norbit") return "NORBITLUVR";
-  if (value === "brickdup") return "BRICKDUP";
-  if (value === "congrats") return "CONGRATS";
-  if (value === "diamond") return "💎";
-  return "";
+function selectedSticker() {
+  return stickers.find((sticker) => sticker.id === selectedStickerId);
 }
 
-function stickerFill() {
-  if (selectedSticker === "brickdup") return "#95e0d0";
-  if (selectedSticker === "congrats") return "#ff96b3";
-  if (selectedSticker === "diamond") return "#8ae6df";
-  return "#ffe777";
+function rotateSelectedSticker() {
+  const sticker = selectedSticker();
+  if (!sticker) return;
+  sticker.rotation = normalizeDegrees(sticker.rotation + 15);
+  renderStickers();
 }
 
-function updateSticker() {
-  const hidden = selectedSticker === "none";
-  els.editableSticker.classList.toggle("hidden", hidden);
-  els.editableSticker.classList.toggle("diamond", selectedSticker === "diamond");
-  els.editableSticker.textContent = stickerState.text;
-  els.editableSticker.style.setProperty("--sticker-x", `${stickerState.x * 100}%`);
-  els.editableSticker.style.setProperty("--sticker-y", `${stickerState.y * 100}%`);
-  els.editableSticker.style.setProperty("--sticker-scale", String(stickerState.scale));
+function removeSelectedSticker() {
+  if (!selectedStickerId) return;
+  stickers = stickers.filter((sticker) => sticker.id !== selectedStickerId);
+  selectedStickerId = stickers.length ? stickers[stickers.length - 1].id : null;
+  renderStickers();
 }
 
 function startStickerGesture(event) {
-  if (selectedSticker === "none") return;
-  event.preventDefault();
-  els.editableSticker.setPointerCapture(event.pointerId);
-  activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-  els.editableSticker.classList.add("dragging");
+  const node = event.currentTarget;
+  const sticker = stickers.find((item) => item.id === Number(node.dataset.stickerId));
+  if (!sticker) return;
 
-  if (activePointers.size === 1) {
-    dragStart = {
-      pointerId: event.pointerId,
-      x: event.clientX,
-      y: event.clientY,
-      stickerX: stickerState.x,
-      stickerY: stickerState.y
-    };
-    pinchStart = null;
-  } else {
-    dragStart = null;
-    pinchStart = makePinchStart();
-  }
+  event.preventDefault();
+  selectedStickerId = sticker.id;
+  els.stickersLayer.querySelectorAll(".editable-sticker").forEach((item) => {
+    item.classList.toggle("selected", item === node);
+  });
+  node.setPointerCapture(event.pointerId);
+  node.classList.add("dragging");
+  activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  gesture = makeGesture(sticker);
 }
 
 function moveStickerGesture(event) {
-  if (!activePointers.has(event.pointerId)) return;
+  if (!activePointers.has(event.pointerId) || !gesture) return;
   event.preventDefault();
   activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
 
-  if (activePointers.size >= 2) {
-    if (!pinchStart) pinchStart = makePinchStart();
+  const sticker = selectedSticker();
+  if (!sticker) return;
+  const stageRect = els.stage.getBoundingClientRect();
+
+  if (activePointers.size >= 2 && gesture.mode === "pinch") {
     const points = [...activePointers.values()];
     const currentDistance = distance(points[0], points[1]);
+    const currentAngle = angle(points[0], points[1]);
     const currentCenter = midpoint(points[0], points[1]);
-    const stageRect = document.querySelector(".stage").getBoundingClientRect();
-    const ratio = currentDistance / Math.max(1, pinchStart.distance);
+    const ratio = currentDistance / Math.max(1, gesture.distance);
 
-    stickerState.scale = clamp(pinchStart.scale * ratio, 0.55, 2.6);
-    stickerState.x = clamp(pinchStart.stickerX + (currentCenter.x - pinchStart.center.x) / stageRect.width, 0.08, 0.92);
-    stickerState.y = clamp(pinchStart.stickerY + (currentCenter.y - pinchStart.center.y) / stageRect.height, 0.08, 0.92);
-    updateSticker();
-    return;
+    sticker.scale = clamp(gesture.scale * ratio, 0.22, 3.2);
+    sticker.rotation = normalizeDegrees(gesture.rotation + currentAngle - gesture.angle);
+    sticker.x = clamp(gesture.x + (currentCenter.x - gesture.center.x) / stageRect.width, 0.04, 0.96);
+    sticker.y = clamp(gesture.y + (currentCenter.y - gesture.center.y) / stageRect.height, 0.04, 0.96);
+  } else {
+    sticker.x = clamp(gesture.x + (event.clientX - gesture.pointer.x) / stageRect.width, 0.04, 0.96);
+    sticker.y = clamp(gesture.y + (event.clientY - gesture.pointer.y) / stageRect.height, 0.04, 0.96);
   }
 
-  if (!dragStart || dragStart.pointerId !== event.pointerId) return;
-  const stageRect = document.querySelector(".stage").getBoundingClientRect();
-  stickerState.x = clamp(dragStart.stickerX + (event.clientX - dragStart.x) / stageRect.width, 0.08, 0.92);
-  stickerState.y = clamp(dragStart.stickerY + (event.clientY - dragStart.y) / stageRect.height, 0.08, 0.92);
-  updateSticker();
+  updateStickerNode(sticker);
 }
 
 function endStickerGesture(event) {
@@ -473,52 +341,162 @@ function endStickerGesture(event) {
   activePointers.delete(event.pointerId);
 
   if (activePointers.size === 0) {
-    dragStart = null;
-    pinchStart = null;
-    els.editableSticker.classList.remove("dragging");
+    gesture = null;
+    els.stickersLayer.querySelectorAll(".editable-sticker").forEach((node) => node.classList.remove("dragging"));
     return;
   }
 
-  if (activePointers.size === 1) {
-    const remaining = activePointers.entries().next().value;
-    dragStart = {
-      pointerId: remaining[0],
-      x: remaining[1].x,
-      y: remaining[1].y,
-      stickerX: stickerState.x,
-      stickerY: stickerState.y
-    };
-    pinchStart = null;
-  }
+  const sticker = selectedSticker();
+  if (sticker) gesture = makeGesture(sticker);
 }
 
-function makePinchStart() {
+function makeGesture(sticker) {
   const points = [...activePointers.values()];
+  if (points.length >= 2) {
+    return {
+      mode: "pinch",
+      distance: distance(points[0], points[1]),
+      angle: angle(points[0], points[1]),
+      center: midpoint(points[0], points[1]),
+      x: sticker.x,
+      y: sticker.y,
+      scale: sticker.scale,
+      rotation: sticker.rotation
+    };
+  }
   return {
-    distance: distance(points[0], points[1]),
-    center: midpoint(points[0], points[1]),
-    scale: stickerState.scale,
-    stickerX: stickerState.x,
-    stickerY: stickerState.y
+    mode: "drag",
+    pointer: points[0],
+    x: sticker.x,
+    y: sticker.y
   };
 }
 
-function distance(a, b) {
-  return Math.hypot(a.x - b.x, a.y - b.y);
+function updateStickerNode(sticker) {
+  const node = els.stickersLayer.querySelector(`[data-sticker-id="${sticker.id}"]`);
+  if (!node) return;
+  node.style.setProperty("--sticker-x", `${sticker.x * 100}%`);
+  node.style.setProperty("--sticker-y", `${sticker.y * 100}%`);
+  node.style.setProperty("--sticker-scale", String(sticker.scale));
+  node.style.setProperty("--sticker-rotation", `${sticker.rotation}deg`);
 }
 
-function midpoint(a, b) {
-  return {
-    x: (a.x + b.x) / 2,
-    y: (a.y + b.y) / 2
-  };
+function applyCanvasFilter(ctx, width, height, filterName) {
+  if (filterName === "none") return;
+
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+  for (let i = 0; i < data.length; i += 4) {
+    let r = data[i];
+    let g = data[i + 1];
+    let b = data[i + 2];
+
+    if (filterName === "mono") {
+      const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+      r = contrast(gray, 1.22);
+      g = contrast(gray, 1.22);
+      b = contrast(gray, 1.22);
+    } else if (filterName === "warm") {
+      r = contrast(r * 1.1 + 12, 1.08);
+      g = contrast(g * 1.03 + 4, 1.06);
+      b = contrast(b * 0.86, 1.04);
+    } else if (filterName === "flash") {
+      r = contrast(r * 1.18 + 10, 1.22);
+      g = contrast(g * 1.16 + 10, 1.22);
+      b = contrast(b * 1.14 + 10, 1.22);
+    } else if (filterName === "acid") {
+      r = contrast(g * 1.55, 1.28);
+      g = contrast(b * 1.35, 1.28);
+      b = contrast(r * 1.2 + 28, 1.28);
+    } else if (filterName === "disco") {
+      r = contrast(b * 1.45 + 12, 1.2);
+      g = contrast(r * 0.85, 1.2);
+      b = contrast(g * 1.55 + 18, 1.2);
+    } else if (filterName === "dream") {
+      r = contrast(r * 1.12 + 16, 1.04);
+      g = contrast(g * 1.02 + 8, 1.02);
+      b = contrast(b * 1.2 + 18, 1.03);
+    } else if (filterName === "vhs") {
+      r = contrast(r * 1.28, 1.36);
+      g = contrast(g * 1.12, 1.3);
+      b = contrast(b * 1.45 + 10, 1.36);
+    }
+
+    data[i] = clampByte(r);
+    data[i + 1] = clampByte(g);
+    data[i + 2] = clampByte(b);
+  }
+  ctx.putImageData(imageData, 0, 0);
 }
 
-function stickerCanvasPoint(width, height) {
-  const stageRect = document.querySelector(".stage").getBoundingClientRect();
+function drawPhotoOverlays(ctx, width, height) {
+  const scale = Math.max(1, width / 1280);
+  if (els.logoOverlay.checked) drawLogo(ctx, width, scale);
+  stickers.forEach((sticker) => {
+    const point = stickerCanvasPoint(sticker, width, height);
+    drawSticker(ctx, sticker, point.x, point.y, scale);
+  });
+}
+
+function drawLogo(ctx, width, scale) {
+  const boxWidth = 160 * scale;
+  const boxHeight = 74 * scale;
+  const x = width - boxWidth - 28 * scale;
+  const y = 34 * scale;
+  ctx.save();
+  ctx.translate(x + boxWidth / 2, y + boxHeight / 2);
+  ctx.rotate(0.03);
+  ctx.fillStyle = "#171310";
+  ctx.strokeStyle = "#f4efe2";
+  ctx.lineWidth = 5 * scale;
+  rectPath(ctx, -boxWidth / 2, -boxHeight / 2, boxWidth, boxHeight);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#f4efe2";
+  ctx.font = `${28 * scale}px Arial, Helvetica, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("BRIX", 0, -12 * scale);
+  ctx.fillStyle = "#f1c64b";
+  ctx.fillText("PIX", 0, 19 * scale);
+  ctx.restore();
+}
+
+function drawSticker(ctx, sticker, centerX, centerY, baseScale) {
+  const scale = baseScale * sticker.scale;
+  const isDiamond = sticker.kind === "diamond";
+  const paddingX = (isDiamond ? 12 : 16) * scale;
+  ctx.save();
+  ctx.font = `${isDiamond ? 74 * scale : 34 * scale}px Arial, Helvetica, sans-serif`;
+  const metrics = ctx.measureText(sticker.text);
+  const width = metrics.width + paddingX * 2;
+  const height = (isDiamond ? 94 : 56) * scale;
+  ctx.translate(centerX, centerY);
+  ctx.rotate((sticker.rotation * Math.PI) / 180);
+  ctx.fillStyle = sticker.fill;
+  ctx.strokeStyle = "#171310";
+  ctx.lineWidth = 4 * scale;
+  rectPath(ctx, -width / 2, -height / 2, width, height);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#171310";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(sticker.text, 0, isDiamond ? 0 : 2 * scale);
+  ctx.restore();
+}
+
+function rectPath(ctx, x, y, width, height) {
+  ctx.beginPath();
+  ctx.rect(x, y, width, height);
+  ctx.closePath();
+}
+
+function stickerCanvasPoint(sticker, width, height) {
+  const stageRect = els.stage.getBoundingClientRect();
   const videoRect = mediaDisplayRect(stageRect.width, stageRect.height, els.camera.videoWidth || width, els.camera.videoHeight || height);
-  const stageX = stickerState.x * stageRect.width;
-  const stageY = stickerState.y * stageRect.height;
+  const stageX = sticker.x * stageRect.width;
+  const stageY = sticker.y * stageRect.height;
   const clampedX = clamp(stageX, videoRect.x, videoRect.x + videoRect.width);
   const clampedY = clamp(stageY, videoRect.y, videoRect.y + videoRect.height);
   return {
@@ -538,6 +516,173 @@ function mediaDisplayRect(stageWidth, stageHeight, mediaWidth, mediaHeight) {
   return { x: (stageWidth - width) / 2, y: 0, width, height: stageHeight };
 }
 
+function stickerText(kind) {
+  if (kind === "norbit") return "NORBITLUVR";
+  if (kind === "brickdup") return "BRICKDUP";
+  if (kind === "congrats") return "CONGRATS";
+  if (kind === "diamond") return "💎";
+  return "";
+}
+
+function stickerFill(kind) {
+  if (kind === "brickdup") return "#d8ecf0";
+  if (kind === "congrats") return "#f2b6a7";
+  if (kind === "diamond") return "#d8ecf0";
+  return "#f1c64b";
+}
+
+function setSelected(selector, selectedButton) {
+  document.querySelectorAll(selector).forEach((button) => {
+    button.classList.toggle("selected", button === selectedButton);
+  });
+}
+
+function openArchiveDb() {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore(STORE_NAME, { keyPath: "id", autoIncrement: true });
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+  return dbPromise;
+}
+
+async function archivePhoto(blob) {
+  try {
+    const db = await openArchiveDb();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      tx.objectStore(STORE_NAME).add({
+        blob,
+        createdAt: new Date().toISOString(),
+        fileName: `brixpix-${Date.now()}.jpg`
+      });
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+    updateArchiveCount();
+  } catch (error) {
+    setStatus("Photo ready. Archive save failed on this browser.");
+  }
+}
+
+async function getArchivedPhotos() {
+  const db = await openArchiveDb();
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(STORE_NAME, "readonly").objectStore(STORE_NAME).getAll();
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function updateArchiveCount() {
+  if (!isAdmin) return;
+  try {
+    const photos = await getArchivedPhotos();
+    els.archiveCount.textContent = `${photos.length} saved`;
+  } catch (error) {
+    els.archiveCount.textContent = "archive unavailable";
+  }
+}
+
+async function exportArchive() {
+  const photos = await getArchivedPhotos();
+  if (!photos.length) {
+    setStatus("No saved photos yet.");
+    return;
+  }
+
+  for (const photo of photos) {
+    const url = URL.createObjectURL(photo.blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = photo.fileName || `brixpix-${photo.id}.jpg`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    await new Promise((resolve) => setTimeout(resolve, 220));
+  }
+}
+
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
+
+function clampByte(value) {
+  return Math.max(0, Math.min(255, Math.round(value)));
+}
+
+function contrast(value, amount) {
+  return (value - 128) * amount + 128;
+}
+
+function distance(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function angle(a, b) {
+  return (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+}
+
+function midpoint(a, b) {
+  return {
+    x: (a.x + b.x) / 2,
+    y: (a.y + b.y) / 2
+  };
+}
+
+function normalizeDegrees(value) {
+  let next = value % 360;
+  if (next > 180) next -= 360;
+  if (next < -180) next += 360;
+  return next;
+}
+
+els.startCamera.addEventListener("click", startCamera);
+els.tapToStart.addEventListener("click", startCamera);
+els.stage.addEventListener("click", (event) => {
+  if (!stream && event.target === els.camera) startCamera();
+});
+els.takePhoto.addEventListener("click", takePhoto);
+els.recordVideo.addEventListener("click", () => {
+  if (recorder && recorder.state === "recording") stopVideo();
+  else recordVideo();
+});
+els.clearCapture.addEventListener("click", () => {
+  clearCapture();
+  setStatus("Ready.");
+});
+els.shareCapture.addEventListener("click", shareCapture);
+els.ringLight.addEventListener("change", () => {
+  els.booth.dataset.ring = els.ringLight.checked ? "on" : "off";
+});
+els.logoOverlay.addEventListener("change", () => {
+  els.booth.dataset.logo = els.logoOverlay.checked ? "on" : "off";
+});
+document.querySelectorAll("[data-filter-choice]").forEach((button) => {
+  button.addEventListener("click", () => setFilter(button.dataset.filterChoice, button));
+});
+document.querySelectorAll("[data-sticker-choice]").forEach((button) => {
+  button.addEventListener("click", () => addSticker(button.dataset.stickerChoice));
+});
+els.rotateSticker.addEventListener("click", rotateSelectedSticker);
+els.removeSticker.addEventListener("click", removeSelectedSticker);
+window.addEventListener("pointermove", moveStickerGesture);
+window.addEventListener("pointerup", endStickerGesture);
+window.addEventListener("pointercancel", endStickerGesture);
+window.addEventListener("pagehide", () => {
+  clearCapture();
+  if (stream) stream.getTracks().forEach((track) => track.stop());
+});
+
+if (isAdmin) {
+  els.adminPanel.classList.remove("hidden");
+  els.exportArchive.addEventListener("click", exportArchive);
+  updateArchiveCount();
+}
+
+setBusy(false);
