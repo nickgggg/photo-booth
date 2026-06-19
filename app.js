@@ -9,6 +9,9 @@ const els = {
   startCamera: document.getElementById("startCamera"),
   timer: document.getElementById("timer"),
   ringLight: document.getElementById("ringLight"),
+  filter: document.getElementById("filter"),
+  sticker: document.getElementById("sticker"),
+  logoOverlay: document.getElementById("logoOverlay"),
   takePhoto: document.getElementById("takePhoto"),
   recordVideo: document.getElementById("recordVideo"),
   shareCapture: document.getElementById("shareCapture"),
@@ -106,9 +109,28 @@ function showCapture(blob, type) {
     media.controls = true;
     media.loop = true;
     media.playsInline = true;
+    media.preload = "metadata";
   }
 
-  els.result.replaceChildren(media);
+  if (type === "video") {
+    const shell = document.createElement("div");
+    shell.className = "video-shell";
+    const playButton = document.createElement("button");
+    playButton.className = "video-play";
+    playButton.type = "button";
+    playButton.setAttribute("aria-label", "Play video");
+    playButton.innerHTML = "<span></span>";
+    playButton.addEventListener("click", () => {
+      if (media.paused) media.play();
+      else media.pause();
+    });
+    media.addEventListener("play", () => playButton.classList.add("hidden"));
+    media.addEventListener("pause", () => playButton.classList.remove("hidden"));
+    shell.append(media, playButton);
+    els.result.replaceChildren(shell, cloneLiveOverlays());
+  } else {
+    els.result.replaceChildren(media);
+  }
   els.result.classList.remove("hidden");
   els.downloadCapture.href = url;
   els.downloadCapture.download = fileName;
@@ -128,7 +150,10 @@ async function takePhoto() {
   canvas.width = video.videoWidth || 1280;
   canvas.height = video.videoHeight || 720;
   const ctx = canvas.getContext("2d");
+  ctx.filter = filterForCanvas(els.filter.value);
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  ctx.filter = "none";
+  drawPhotoOverlays(ctx, canvas.width, canvas.height);
 
   canvas.toBlob((blob) => {
     if (!blob) {
@@ -232,6 +257,15 @@ els.shareCapture.addEventListener("click", shareCapture);
 els.ringLight.addEventListener("change", () => {
   els.booth.dataset.ring = els.ringLight.checked ? "on" : "off";
 });
+els.filter.addEventListener("change", () => {
+  els.booth.dataset.filter = els.filter.value;
+});
+els.sticker.addEventListener("change", () => {
+  els.booth.dataset.sticker = els.sticker.value;
+});
+els.logoOverlay.addEventListener("change", () => {
+  els.booth.dataset.logo = els.logoOverlay.checked ? "on" : "off";
+});
 
 window.addEventListener("pagehide", () => {
   clearCapture();
@@ -239,3 +273,81 @@ window.addEventListener("pagehide", () => {
 });
 
 setBusy(false);
+
+function cloneLiveOverlays() {
+  const overlays = document.getElementById("liveOverlays").cloneNode(true);
+  overlays.id = "";
+  overlays.className = "capture-overlays";
+  return overlays;
+}
+
+function filterForCanvas(filterName) {
+  if (filterName === "warm") return "sepia(0.24) saturate(1.18) contrast(1.04)";
+  if (filterName === "flash") return "brightness(1.12) contrast(1.16) saturate(1.22)";
+  if (filterName === "mono") return "grayscale(1) contrast(1.18)";
+  return "none";
+}
+
+function drawPhotoOverlays(ctx, width, height) {
+  const scale = Math.max(1, width / 1280);
+  if (els.logoOverlay.checked) drawLogo(ctx, width, scale);
+  if (els.sticker.value === "heart") drawSticker(ctx, "JUST MARRIED", 34 * scale, 86 * scale, -0.07, "#ffe777", scale);
+  if (els.sticker.value === "party") drawSticker(ctx, "PARTY PROOF", width - 420 * scale, height - 130 * scale, 0.05, "#95e0d0", scale);
+}
+
+function drawLogo(ctx, width, scale) {
+  const boxWidth = 174 * scale;
+  const boxHeight = 82 * scale;
+  const x = width - boxWidth - 34 * scale;
+  const y = 54 * scale;
+  ctx.save();
+  ctx.translate(x + boxWidth / 2, y + boxHeight / 2);
+  ctx.rotate(0.035);
+  ctx.fillStyle = "#d7356b";
+  ctx.strokeStyle = "#fff7dd";
+  ctx.lineWidth = 6 * scale;
+  roundedRect(ctx, -boxWidth / 2, -boxHeight / 2, boxWidth, boxHeight, 12 * scale);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#fff7dd";
+  ctx.font = `${28 * scale}px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("BRICK", 0, -13 * scale);
+  ctx.fillStyle = "#ffe777";
+  ctx.fillText("2026", 0, 19 * scale);
+  ctx.restore();
+}
+
+function drawSticker(ctx, text, x, y, rotation, fill, scale) {
+  const paddingX = 18 * scale;
+  const paddingY = 12 * scale;
+  ctx.save();
+  ctx.font = `${34 * scale}px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif`;
+  const metrics = ctx.measureText(text);
+  const width = metrics.width + paddingX * 2;
+  const height = 58 * scale;
+  ctx.translate(x + width / 2, y + height / 2);
+  ctx.rotate(rotation);
+  ctx.fillStyle = fill;
+  ctx.strokeStyle = "#221719";
+  ctx.lineWidth = 5 * scale;
+  roundedRect(ctx, -width / 2, -height / 2, width, height, 10 * scale);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#221719";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, 0, 3 * scale);
+  ctx.restore();
+}
+
+function roundedRect(ctx, x, y, width, height, radius) {
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.arcTo(x + width, y, x + width, y + height, radius);
+  ctx.arcTo(x + width, y + height, x, y + height, radius);
+  ctx.arcTo(x, y + height, x, y, radius);
+  ctx.arcTo(x, y, x + width, y, radius);
+  ctx.closePath();
+}

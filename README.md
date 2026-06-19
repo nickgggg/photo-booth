@@ -21,4 +21,23 @@ On iPad Safari, the Share button uses the native iOS share sheet when available.
 
 ## Ring light
 
-The ring light toggle adds a bright white screen border. For best results at a wedding booth, use an actual USB/battery ring light too.
+The ring light toggle adds a large soft white screen border. For best results at a wedding booth, use an actual USB/battery ring light too.
+
+## Overlays
+
+Guests can pick a lightweight filter, add a sticker, and toggle the `brick2026` mark. Photo overlays are burned into downloaded/shared photos. Video overlays appear in the booth preview/playback UI; keeping them burned into videos would require a more complex canvas-recording path and more device testing on iPad Safari.
+
+## Printer notes
+
+The simple iPad path is AirPrint: buy an AirPrint-compatible photo printer, keep it on the same Wi-Fi as the iPad, and use the iOS share sheet from the captured photo.
+
+Receipt-printer output is funny, but it is a separate project. Most thermal receipt printers want USB, Bluetooth serial, a vendor app, or a local computer/server bridge. If you want that vibe, the least fragile version is probably a laptop running the booth plus a USB thermal printer, with a dedicated "print receipt" layout.
+
+## Extra wedding-hit ideas
+
+- A short prompt card next to the iPad: "Give us your worst advice."
+- One-tap themed stickers: ceremony, reception, afterparty.
+- A prop table with a few visually loud items, not twenty tiny options.
+- A second "guestbook mode" later: record a 10-second video toast.
+- A QR code nearby that opens a shared Google Photos/Drive upload folder for guests who want to contribute phone photos.
+- Print two copies when printing: one for the guest, one for a physical guestbook.

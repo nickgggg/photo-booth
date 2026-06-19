@@ -10,10 +10,20 @@
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
-    <main class="booth" data-ring="off">
+    <main class="booth" data-ring="off" data-filter="none" data-sticker="none" data-logo="on">
       <section class="stage" aria-label="Camera preview and capture result">
+        <div class="marquee" aria-hidden="true">
+          <span>brick2026</span>
+          <span>brick2026</span>
+          <span>brick2026</span>
+        </div>
         <video id="camera" class="camera" autoplay playsinline muted></video>
         <canvas id="snapshot" class="hidden"></canvas>
+        <div id="liveOverlays" class="live-overlays" aria-hidden="true">
+          <div class="booth-logo">brick<span>2026</span></div>
+          <div class="sticker sticker-heart">Just married</div>
+          <div class="sticker sticker-party">Party proof</div>
+        </div>
         <div id="result" class="result hidden" aria-live="polite"></div>
         <div id="countdown" class="countdown hidden" aria-live="assertive"></div>
         <div class="privacy">Private session. No previous photos are shown.</div>
@@ -36,6 +46,32 @@
           <label class="toggle">
             <input id="ringLight" type="checkbox">
             <span>Ring light</span>
+          </label>
+        </div>
+
+        <div class="row overlay-row">
+          <label class="field">
+            <span>Filter</span>
+            <select id="filter">
+              <option value="none" selected>Clean</option>
+              <option value="warm">Warm glow</option>
+              <option value="flash">Flash pop</option>
+              <option value="mono">Old booth</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Sticker</span>
+            <select id="sticker">
+              <option value="none" selected>None</option>
+              <option value="heart">Just married</option>
+              <option value="party">Party proof</option>
+            </select>
+          </label>
+
+          <label class="toggle compact">
+            <input id="logoOverlay" type="checkbox" checked>
+            <span>Logo</span>
           </label>
         </div>
 
