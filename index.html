@@ -7,13 +7,13 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="BRIXPIX">
     <meta name="application-name" content="BRIXPIX">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#f4efe2">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="theme-color" content="#f8f3e8">
     <title>BRIXPIX</title>
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="apple-touch-icon" href="icons/brixpix-apple-touch-icon.png">
     <link rel="icon" href="icons/brixpix-icon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=20260621-2">
   </head>
   <body>
     <main class="booth" data-ring="off" data-filter="none" data-logo="on">
@@ -26,108 +26,122 @@
         </div>
         <div id="result" class="result hidden" aria-live="polite"></div>
         <div id="countdown" class="countdown hidden" aria-live="assertive"></div>
-        <button id="ringLightButton" class="stage-light" type="button" aria-label="Toggle ring light">⚡</button>
+        <button id="ringLightButton" class="stage-light" type="button" aria-label="Toggle ring light" title="Ring light">⚡</button>
         <div class="stage-capture">
           <button id="takePhoto" class="shutter photo-shutter" type="button" disabled aria-label="Take photo">📷</button>
-          <button id="recordVideo" class="shutter video-shutter" type="button" disabled aria-label="Record video">
-            🎥
-          </button>
+          <button id="recordVideo" class="shutter video-shutter" type="button" disabled aria-label="Record video">🎥</button>
         </div>
-        <button id="tapToStart" class="tap-to-start" type="button">Tap Camera To Start</button>
       </section>
 
       <section class="controls" aria-label="Photo booth controls">
-        <div class="brand-lockup" aria-hidden="true">
-          <span>BRIXPIX</span>
-          <strong>BRICK 2026</strong>
-        </div>
+        <header class="brand-lockup" aria-label="BRIXPIX, Brick 2026 photo booth">
+          <span class="brand-star" aria-hidden="true">✦</span>
+          <div>
+            <span class="brand-name">BRIXPIX</span>
+            <strong>BRICK 2026 PHOTO BOOTH</strong>
+          </div>
+          <span class="brand-star" aria-hidden="true">✦</span>
+        </header>
 
-        <div class="control-section">
-          <div class="mini-label">Session</div>
-          <div class="top-row">
-            <button id="startCamera" class="primary" type="button">Turn On Camera</button>
-            <button id="refreshApp" type="button">Refresh</button>
+        <div class="controls-scroll">
+          <div class="session-row">
+            <button id="startCamera" class="primary camera-power" type="button">Turn On Camera</button>
+            <button id="refreshApp" class="icon-button" type="button" aria-label="Refresh app" title="Refresh app">↻</button>
+          </div>
+
+          <div class="quick-settings">
+            <div class="control-section timer-section">
+              <label class="field" for="timer">
+                <span>Timer</span>
+                <select id="timer">
+                  <option value="0">Off</option>
+                  <option value="3" selected>3 sec</option>
+                  <option value="5">5 sec</option>
+                  <option value="10">10 sec</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="control-section rotate-section">
+              <div class="mini-label">Camera</div>
+              <div class="rotate-tools">
+                <button id="rotateCameraLeft" class="icon-button" type="button" aria-label="Rotate camera left" title="Rotate camera left">↶</button>
+                <button id="rotateCameraRight" class="icon-button" type="button" aria-label="Rotate camera right" title="Rotate camera right">↷</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="control-section overlay-panel filter-panel">
+            <div class="section-heading">
+              <div class="mini-label">Filter</div>
+              <span>Pick a mood</span>
+            </div>
+            <div class="chip-row filters" role="group" aria-label="Filter">
+              <button class="chip selected" type="button" data-filter-choice="none">Clean</button>
+              <button class="chip" type="button" data-filter-choice="warm">Golden</button>
+              <button class="chip" type="button" data-filter-choice="flash">Flash</button>
+              <button class="chip" type="button" data-filter-choice="mono">B&amp;W</button>
+              <button class="chip" type="button" data-filter-choice="acid">Acid</button>
+              <button class="chip" type="button" data-filter-choice="disco">Disco</button>
+              <button class="chip" type="button" data-filter-choice="dream">Dream</button>
+              <button class="chip" type="button" data-filter-choice="vhs">VHS</button>
+            </div>
+          </div>
+
+          <div class="control-section overlay-panel sticker-panel">
+            <div class="section-heading">
+              <div class="mini-label">Stickers</div>
+              <span>Add as many as you like</span>
+            </div>
+            <div class="chip-row stickers" role="group" aria-label="Add sticker">
+              <button class="chip word-sticker pink" type="button" data-sticker-choice="norbit">NORBITLUVR</button>
+              <button class="chip word-sticker cyan" type="button" data-sticker-choice="brickdup">BRICKDUP</button>
+              <button class="chip word-sticker yellow" type="button" data-sticker-choice="congrats">CONGRATS</button>
+              <button class="chip emoji-chip" type="button" data-sticker-choice="diamond">💎</button>
+              <button class="chip emoji-chip" type="button" data-sticker-choice="ring">💍</button>
+              <button class="chip emoji-chip" type="button" data-sticker-choice="taco">🌮</button>
+              <button class="chip emoji-chip" type="button" data-sticker-choice="married">💒</button>
+              <button class="chip emoji-chip wide" type="button" data-sticker-choice="horsefart">🐎💨</button>
+            </div>
+          </div>
+
+          <div class="control-section finishing-section">
+            <div class="sticker-actions">
+              <div class="mini-label">Selected Sticker</div>
+              <div class="sticker-tools">
+                <button id="rotateSticker" class="tool-button" type="button">↻ Rotate</button>
+                <button id="removeSticker" class="tool-button danger" type="button">× Remove</button>
+              </div>
+            </div>
+
+            <div class="logo-section">
+              <label class="toggle compact">
+                <input id="logoOverlay" type="checkbox" checked>
+                <span>brick2026 watermark</span>
+              </label>
+            </div>
+          </div>
+
+          <div id="adminPanel" class="admin-panel hidden">
+            <button id="exportArchive" type="button">Export Saved Photos</button>
+            <span id="archiveCount">0 saved</span>
+            <small>Photos save locally and sync to the built-in Drive folder automatically.</small>
+          </div>
+
+          <p id="status" class="status">Turn on the camera to begin.</p>
+
+          <div class="event-mark" aria-hidden="true">
+            <span>B + N</span>
+            <strong>10 · 10 · 26</strong>
           </div>
         </div>
 
-        <div class="control-section">
-          <div class="mini-label">Timer</div>
-          <label class="field wheel-field">
-            <span>Delay before capture</span>
-            <select id="timer">
-              <option value="0">Off</option>
-              <option value="3" selected>3 seconds</option>
-              <option value="5">5 seconds</option>
-              <option value="10">10 seconds</option>
-            </select>
-          </label>
-        </div>
-
-        <div class="control-section">
-          <div class="mini-label">Camera Rotate</div>
-          <div class="top-row">
-            <button id="rotateCameraLeft" type="button">-90</button>
-            <button id="rotateCameraRight" type="button">+90</button>
-          </div>
-        </div>
-
-        <div class="control-section overlay-panel">
-          <div class="mini-label">Filter</div>
-          <div class="chip-row filters" role="group" aria-label="Filter">
-            <button class="chip selected" type="button" data-filter-choice="none">Clean</button>
-            <button class="chip" type="button" data-filter-choice="warm">Warm</button>
-            <button class="chip" type="button" data-filter-choice="flash">Flash</button>
-            <button class="chip" type="button" data-filter-choice="mono">B/W</button>
-            <button class="chip" type="button" data-filter-choice="acid">Acid</button>
-            <button class="chip" type="button" data-filter-choice="disco">Disco</button>
-            <button class="chip" type="button" data-filter-choice="dream">Dream</button>
-            <button class="chip" type="button" data-filter-choice="vhs">VHS</button>
-          </div>
-        </div>
-
-        <div class="control-section overlay-panel">
-          <div class="mini-label">Add Sticker</div>
-          <div class="chip-row stickers" role="group" aria-label="Add sticker">
-            <button class="chip" type="button" data-sticker-choice="norbit">NORBITLUVR</button>
-            <button class="chip" type="button" data-sticker-choice="brickdup">BRICKDUP</button>
-            <button class="chip" type="button" data-sticker-choice="congrats">CONGRATS</button>
-            <button class="chip emoji-chip" type="button" data-sticker-choice="diamond">💎</button>
-            <button class="chip emoji-chip" type="button" data-sticker-choice="ring">💍</button>
-            <button class="chip emoji-chip" type="button" data-sticker-choice="taco">🌮</button>
-            <button class="chip emoji-chip" type="button" data-sticker-choice="married">💒</button>
-            <button class="chip emoji-chip" type="button" data-sticker-choice="horsefart">🐎💨</button>
-          </div>
-        </div>
-
-        <div class="control-section sticker-actions">
-          <div class="mini-label">Sticker Tools</div>
-          <div class="sticker-tools">
-            <button id="rotateSticker" class="tool-button" type="button">Rotate</button>
-            <button id="removeSticker" class="tool-button" type="button">Remove</button>
-          </div>
-        </div>
-
-        <div class="control-section logo-section">
-          <label class="toggle compact">
-            <input id="logoOverlay" type="checkbox" checked>
-            <span>Brick watermark</span>
-          </label>
-        </div>
-
-        <div id="adminPanel" class="admin-panel hidden">
-          <button id="exportArchive" type="button">Export Saved Photos</button>
-          <span id="archiveCount">0 saved</span>
-          <small>Photos save locally and sync to the built-in Drive folder automatically.</small>
-        </div>
-
-        <p id="status" class="status">Turn on camera, then pick a filter or sticker.</p>
-
-        <div class="control-section share-row">
-          <button id="shareCapture" type="button" disabled>Share</button>
-        </div>
+        <footer class="controls-footer">
+          <button id="shareCapture" type="button" disabled>Share Latest Photo</button>
+        </footer>
       </section>
     </main>
 
-    <script src="app.js?v=20260621-1"></script>
+    <script src="app.js?v=20260621-2"></script>
   </body>
 </html>

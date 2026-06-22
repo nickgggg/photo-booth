@@ -1,10 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
-  <rect width="180" height="180" fill="#f4efe2"/>
-  <rect x="17" y="17" width="146" height="146" fill="#171310"/>
-  <rect x="29" y="29" width="122" height="122" fill="#d94a38"/>
-  <rect x="41" y="41" width="98" height="98" fill="#f4efe2"/>
-  <circle cx="90" cy="74" r="30" fill="#171310"/>
-  <circle cx="90" cy="74" r="17" fill="#215f79"/>
-  <rect x="47" y="112" width="86" height="24" fill="#171310"/>
-  <text x="90" y="130" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="900" fill="#f4efe2">BRIXPIX</text>
+  <rect width="180" height="180" fill="#161313"/>
+  <rect x="17" y="17" width="146" height="146" fill="#f8f3e8" stroke="#e83f78" stroke-width="5"/>
+  <rect x="27" y="27" width="126" height="126" fill="none" stroke="#161313" stroke-width="2"/>
+  <text x="90" y="83" text-anchor="middle" font-family="Georgia, Times New Roman, serif" font-size="43" font-weight="700" fill="#161313">BRIX</text>
+  <text x="90" y="124" text-anchor="middle" font-family="Georgia, Times New Roman, serif" font-size="43" font-style="italic" font-weight="700" fill="#e83f78">PIX</text>
+  <text x="42" y="45" text-anchor="middle" font-family="Georgia, Times New Roman, serif" font-size="19" fill="#13aeba">✦</text>
+  <text x="138" y="145" text-anchor="middle" font-family="Georgia, Times New Roman, serif" font-size="19" fill="#f0c84b">✦</text>
 </svg>

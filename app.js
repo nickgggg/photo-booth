@@ -8,7 +8,6 @@ const els = {
   stickersLayer: document.getElementById("stickersLayer"),
   result: document.getElementById("result"),
   countdown: document.getElementById("countdown"),
-  tapToStart: document.getElementById("tapToStart"),
   startCamera: document.getElementById("startCamera"),
   refreshApp: document.getElementById("refreshApp"),
   timer: document.getElementById("timer"),
@@ -98,8 +97,8 @@ async function startCamera() {
 
     els.camera.srcObject = stream;
     await els.camera.play();
-    els.tapToStart.classList.add("hidden");
     els.startCamera.textContent = "Camera On";
+    els.startCamera.classList.add("is-on");
     els.startCamera.disabled = true;
     setStatus(window.MediaRecorder ? "Ready." : "Ready for photos. Video is not supported here.");
   } catch (error) {
@@ -132,7 +131,6 @@ function restartCameraForOrientation() {
   if (!stream || busy) return;
   clearTimeout(orientationRestartTimer);
   orientationRestartTimer = setTimeout(() => {
-    els.tapToStart.classList.add("hidden");
     startCamera().then(() => {
       setStatus("Camera adjusted.");
     }).catch(() => {
@@ -153,13 +151,21 @@ async function runTimer() {
   els.countdown.classList.add("hidden");
 }
 
-function showCapture(blob, type) {
+function timestampFileName(extension) {
+  const now = new Date();
+  const pad = (value, length = 2) => String(value).padStart(length, "0");
+  const date = [now.getFullYear(), pad(now.getMonth() + 1), pad(now.getDate())].join("-");
+  const time = [pad(now.getHours()), pad(now.getMinutes()), pad(now.getSeconds())].join("-");
+  return `BRIXPIX_${date}_${time}-${pad(now.getMilliseconds(), 3)}.${extension}`;
+}
+
+function showCapture(blob, type, fileName = null) {
   clearCapture();
 
   const extension = type === "photo" ? "jpg" : videoExtension(blob.type);
-  const fileName = `brixpix-${new Date().toISOString().replace(/[:.]/g, "-")}.${extension}`;
+  const captureFileName = fileName || timestampFileName(extension);
   const url = URL.createObjectURL(blob);
-  currentCapture = { blob, fileName, type, url };
+  currentCapture = { blob, fileName: captureFileName, type, url };
 
   const media = type === "photo" ? document.createElement("img") : document.createElement("video");
   media.src = url;
@@ -209,8 +215,9 @@ async function takePhoto() {
       setBusy(false);
       return;
     }
-    await archivePhoto(blob);
-    showCapture(blob, "photo");
+    const fileName = timestampFileName("jpg");
+    await archivePhoto(blob, fileName);
+    showCapture(blob, "photo", fileName);
   }, "image/jpeg", 0.92);
 }
 
@@ -637,7 +644,7 @@ function openArchiveDb() {
   return dbPromise;
 }
 
-async function archivePhoto(blob) {
+async function archivePhoto(blob, fileName = timestampFileName("jpg")) {
   try {
     const db = await openArchiveDb();
     await new Promise((resolve, reject) => {
@@ -645,7 +652,7 @@ async function archivePhoto(blob) {
       const request = tx.objectStore(STORE_NAME).add({
         blob,
         createdAt: new Date().toISOString(),
-        fileName: `brixpix-${Date.now()}.jpg`,
+        fileName,
         uploadedAt: null,
         uploadAttempts: 0
       });
@@ -675,7 +682,7 @@ async function uploadPhoto(record, endpoint) {
         "Content-Type": "text/plain"
       },
       body: JSON.stringify({
-        fileName: record.fileName || `brixpix-${record.id || Date.now()}.jpg`,
+        fileName: record.fileName || timestampFileName("jpg"),
         mimeType: record.blob.type || "image/jpeg",
         dataUrl
       })
@@ -876,7 +883,6 @@ els.startCamera.addEventListener("click", startCamera);
 els.refreshApp.addEventListener("click", refreshApp);
 els.rotateCameraLeft.addEventListener("click", () => rotateCamera(-90));
 els.rotateCameraRight.addEventListener("click", () => rotateCamera(90));
-els.tapToStart.addEventListener("click", startCamera);
 els.stage.addEventListener("click", (event) => {
   if (!stream && event.target === els.camera) startCamera();
 });
