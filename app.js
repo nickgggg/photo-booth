@@ -33,7 +33,17 @@ const DB_NAME = "brixpix-archive";
 const DB_VERSION = 1;
 const STORE_NAME = "photos";
 const UPLOAD_ENDPOINT_KEY = "brixpixUploadEndpoint";
-const isAdmin = new URLSearchParams(location.search).has("admin");
+const isAdmin = (() => {
+  const params = new URLSearchParams(location.search);
+  if (params.has("admin")) return true;
+  const rawQuery = location.search.toLowerCase();
+  const rawHash = location.hash.toLowerCase();
+  return (
+    rawQuery.includes("admin1") ||
+    rawQuery.includes("admin=true") ||
+    rawHash.includes("admin")
+  );
+})();
 
 let stream = null;
 let recorder = null;
