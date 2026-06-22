@@ -32,7 +32,9 @@ const STORE_NAME = "photos";
 const DEFAULT_UPLOAD_ENDPOINT = "https://script.google.com/macros/s/AKfycby2mTliV2bwMCL7y_N4RgBidcAF9aNHouUjzp2dTZ8u1yzjnaqqZHEfkn2Xk67BSgbc/exec";
 const UPLOAD_VERIFICATION_KEY = "brixpixVerifiedUploadsV1";
 const UPLOAD_RETRY_MS = 30000;
-const VIDEO_MAX_MS = 30000;
+const VIDEO_MAX_MS = 15000;
+const VIDEO_BITS_PER_SECOND = 2000000;
+const AUDIO_BITS_PER_SECOND = 96000;
 const isAdmin = (() => {
   const params = new URLSearchParams(location.search);
   if (params.has("admin")) return true;
@@ -59,6 +61,7 @@ let dbPromise = null;
 let orientationRestartTimer = null;
 let cameraRotation = 0;
 let uploadSyncInFlight = false;
+let uploadSyncRequested = false;
 let uploadRetryTimer = null;
 let uploadPreparationPromise = null;
 const activePointers = new Map();
@@ -232,25 +235,55 @@ async function recordVideo() {
 
   chunks = [];
   const mimeType = pickVideoMimeType();
-  recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
-  recorder.ondataavailable = (event) => {
+  try {
+    recorder = createVideoRecorder(mimeType);
+  } catch (error) {
+    setStatus("Video recording is not available. Refresh and try again.");
+    setBusy(false);
+    return;
+  }
+  const activeRecorder = recorder;
+  activeRecorder.ondataavailable = (event) => {
     if (event.data.size > 0) chunks.push(event.data);
   };
-  recorder.onstop = async () => {
+  activeRecorder.onerror = () => {
     clearTimeout(videoStopTimer);
-    const blob = new Blob(chunks, { type: recorder.mimeType || "video/webm" });
+    if (recorder === activeRecorder) recorder = null;
+    els.recordVideo.textContent = "🎥";
+    els.recordVideo.classList.remove("recording");
+    setBusy(false);
+    setStatus("Video recording failed. Try again.");
+  };
+  activeRecorder.onstop = async () => {
+    clearTimeout(videoStopTimer);
+    const blob = new Blob(chunks, { type: activeRecorder.mimeType || "video/webm" });
     const fileName = timestampFileName(videoExtension(blob.type));
-    recorder = null;
-    await archiveCapture(blob, fileName);
+    if (recorder === activeRecorder) recorder = null;
+    const savedLocally = await archiveCapture(blob, fileName);
     showCapture(blob, "video", fileName);
+    if (!savedLocally) setStatus("Video ready, but local archive save failed.");
   };
 
-  recorder.start(1000);
+  activeRecorder.start();
   videoStopTimer = setTimeout(stopVideo, VIDEO_MAX_MS);
   els.recordVideo.textContent = "Stop";
   els.recordVideo.classList.add("recording");
   els.recordVideo.disabled = false;
-  setStatus("Recording. Tap Stop, or it stops automatically at 30 seconds.");
+  setStatus("Recording. Tap Stop, or it stops automatically at 15 seconds.");
+}
+
+function createVideoRecorder(mimeType) {
+  const options = {
+    videoBitsPerSecond: VIDEO_BITS_PER_SECOND,
+    audioBitsPerSecond: AUDIO_BITS_PER_SECOND
+  };
+  if (mimeType) options.mimeType = mimeType;
+
+  try {
+    return new MediaRecorder(stream, options);
+  } catch (error) {
+    return mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+  }
 }
 
 function stopVideo() {
@@ -656,21 +689,23 @@ async function archiveCapture(blob, fileName = timestampFileName("jpg")) {
     const db = await openArchiveDb();
     await new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, "readwrite");
-      const request = tx.objectStore(STORE_NAME).add({
+      tx.objectStore(STORE_NAME).add({
         blob,
         createdAt: new Date().toISOString(),
         fileName,
         uploadedAt: null,
         uploadAttempts: 0
       });
-      request.onsuccess = resolve;
       tx.oncomplete = resolve;
       tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
     });
     updateArchiveCount();
     syncArchiveUploads();
+    return true;
   } catch (error) {
     setStatus("Capture ready. Archive save failed on this browser.");
+    return false;
   }
 }
 
@@ -778,38 +813,37 @@ async function syncArchiveUploads() {
     return;
   }
 
-  if (uploadSyncInFlight) return;
+  if (uploadSyncInFlight) {
+    uploadSyncRequested = true;
+    return;
+  }
   uploadSyncInFlight = true;
 
   try {
     let uploadedCount = 0;
     let uploadFailed = false;
 
-    while (!uploadFailed) {
-      const archivedPhotos = await getArchivedPhotos();
-      const pending = archivedPhotos.filter((photo) => !photo.uploadedAt);
-      if (!pending.length) break;
+    const archivedPhotos = await getArchivedPhotos();
+    const pending = archivedPhotos.filter((capture) => !capture.uploadedAt);
 
-      for (const photo of pending) {
-        const ok = await uploadCapture(photo, endpoint);
-        if (ok) {
-          uploadedCount += 1;
-          await updateArchivedPhoto(photo.id, {
-            uploadedAt: new Date().toISOString(),
-            uploadAttempts: (photo.uploadAttempts || 0) + 1
-          });
-        } else {
-          uploadFailed = true;
-          await updateArchivedPhoto(photo.id, {
-            uploadAttempts: (photo.uploadAttempts || 0) + 1
-          });
-          scheduleUploadRetry();
-          break;
-        }
+    for (const capture of pending) {
+      const ok = await uploadCapture(capture, endpoint);
+      if (ok) {
+        uploadedCount += 1;
+        await updateArchivedPhoto(capture.id, {
+          uploadedAt: new Date().toISOString(),
+          uploadAttempts: (capture.uploadAttempts || 0) + 1
+        });
+      } else {
+        uploadFailed = true;
+        await updateArchivedPhoto(capture.id, {
+          uploadAttempts: (capture.uploadAttempts || 0) + 1
+        });
       }
     }
 
     if (uploadFailed) {
+      scheduleUploadRetry();
       if (!busy) setStatus("Saved locally. Cloud upload will retry.");
     } else if (uploadedCount && currentCapture) {
       setStatus("Saved locally and to Drive.");
@@ -819,6 +853,10 @@ async function syncArchiveUploads() {
     scheduleUploadRetry();
   } finally {
     uploadSyncInFlight = false;
+    if (uploadSyncRequested) {
+      uploadSyncRequested = false;
+      syncArchiveUploads();
+    }
   }
 }
 

@@ -13,7 +13,7 @@ Camera access requires HTTPS or localhost. GitHub Pages gives you HTTPS for free
 
 ## Owner archive
 
-Every photo and video is silently saved to local IndexedDB inside this web app on the iPad after capture. This is not the iOS Photos app, so saved captures will not appear in Photos automatically. Guests do not see a gallery, and clearing the guest preview does not remove the owner archive. Videos stop automatically after 30 seconds to keep free cloud uploads reliable.
+Every photo and video is silently saved to local IndexedDB inside this web app on the iPad after capture. This is not the iOS Photos app, so saved captures will not appear in Photos automatically. Guests do not see a gallery, and clearing the guest preview does not remove the owner archive. Videos stop automatically after 15 seconds and use a conservative bitrate to keep free cloud uploads reliable.
 
 To export saved photos, open the app on the same iPad with `?admin=1` at the end of the URL and use Export Saved Photos.
 
