@@ -23,8 +23,6 @@ const els = {
   shareCapture: document.getElementById("shareCapture"),
   adminPanel: document.getElementById("adminPanel"),
   exportArchive: document.getElementById("exportArchive"),
-  uploadEndpoint: document.getElementById("uploadEndpoint"),
-  saveUploadEndpoint: document.getElementById("saveUploadEndpoint"),
   archiveCount: document.getElementById("archiveCount"),
   status: document.getElementById("status")
 };
@@ -33,7 +31,7 @@ const DB_NAME = "brixpix-archive";
 const DB_VERSION = 1;
 const STORE_NAME = "photos";
 const DEFAULT_UPLOAD_ENDPOINT = "https://script.google.com/macros/s/AKfycby2mTliV2bwMCL7y_N4RgBidcAF9aNHouUjzp2dTZ8u1yzjnaqqZHEfkn2Xk67BSgbc/exec";
-const UPLOAD_ENDPOINT_KEY = "brixpixUploadEndpoint";
+const UPLOAD_VERIFICATION_KEY = "brixpixVerifiedUploadsV1";
 const UPLOAD_RETRY_MS = 30000;
 const isAdmin = (() => {
   const params = new URLSearchParams(location.search);
@@ -61,6 +59,7 @@ let orientationRestartTimer = null;
 let cameraRotation = 0;
 let uploadSyncInFlight = false;
 let uploadRetryTimer = null;
+let uploadPreparationPromise = null;
 const activePointers = new Map();
 let gesture = null;
 
@@ -662,15 +661,16 @@ async function archivePhoto(blob) {
 }
 
 function getUploadEndpoint() {
-  return localStorage.getItem(UPLOAD_ENDPOINT_KEY) || DEFAULT_UPLOAD_ENDPOINT;
+  return DEFAULT_UPLOAD_ENDPOINT;
 }
 
 async function uploadPhoto(record, endpoint) {
   try {
     const dataUrl = await blobToDataUrl(record.blob);
-    await fetch(endpoint, {
+    const response = await fetch(endpoint, {
       method: "POST",
-      mode: "no-cors",
+      mode: "cors",
+      credentials: "omit",
       headers: {
         "Content-Type": "text/plain"
       },
@@ -680,7 +680,9 @@ async function uploadPhoto(record, endpoint) {
         dataUrl
       })
     });
-    return true;
+    if (!response.ok) return false;
+    const result = await response.json();
+    return result.ok === true;
   } catch (error) {
     return false;
   }
@@ -730,34 +732,75 @@ function scheduleUploadRetry() {
   }, UPLOAD_RETRY_MS);
 }
 
+function prepareUploadQueue() {
+  if (uploadPreparationPromise) return uploadPreparationPromise;
+
+  uploadPreparationPromise = (async () => {
+    if (localStorage.getItem(UPLOAD_VERIFICATION_KEY) === "1") return;
+
+    const archivedPhotos = await getArchivedPhotos();
+    for (const photo of archivedPhotos) {
+      if (photo.uploadedAt) {
+        await updateArchivedPhoto(photo.id, { uploadedAt: null });
+      }
+    }
+    localStorage.setItem(UPLOAD_VERIFICATION_KEY, "1");
+  })();
+
+  return uploadPreparationPromise;
+}
+
 async function syncArchiveUploads() {
   const endpoint = getUploadEndpoint();
-  if (!endpoint || uploadSyncInFlight || !navigator.onLine) {
+  if (!endpoint || !navigator.onLine) {
     if (endpoint && !navigator.onLine) scheduleUploadRetry();
     return;
   }
 
+  try {
+    await prepareUploadQueue();
+  } catch (error) {
+    scheduleUploadRetry();
+    return;
+  }
+
+  if (uploadSyncInFlight) return;
   uploadSyncInFlight = true;
 
   try {
-    const archivedPhotos = await getArchivedPhotos();
-    const pending = archivedPhotos.filter((photo) => !photo.uploadedAt);
+    let uploadedCount = 0;
+    let uploadFailed = false;
 
-    for (const photo of pending) {
-      const ok = await uploadPhoto(photo, endpoint);
-      if (ok) {
-        await updateArchivedPhoto(photo.id, {
-          uploadedAt: new Date().toISOString(),
-          uploadAttempts: (photo.uploadAttempts || 0) + 1
-        });
-      } else {
-        await updateArchivedPhoto(photo.id, {
-          uploadAttempts: (photo.uploadAttempts || 0) + 1
-        });
-        scheduleUploadRetry();
-        break;
+    while (!uploadFailed) {
+      const archivedPhotos = await getArchivedPhotos();
+      const pending = archivedPhotos.filter((photo) => !photo.uploadedAt);
+      if (!pending.length) break;
+
+      for (const photo of pending) {
+        const ok = await uploadPhoto(photo, endpoint);
+        if (ok) {
+          uploadedCount += 1;
+          await updateArchivedPhoto(photo.id, {
+            uploadedAt: new Date().toISOString(),
+            uploadAttempts: (photo.uploadAttempts || 0) + 1
+          });
+        } else {
+          uploadFailed = true;
+          await updateArchivedPhoto(photo.id, {
+            uploadAttempts: (photo.uploadAttempts || 0) + 1
+          });
+          scheduleUploadRetry();
+          break;
+        }
       }
     }
+
+    if (uploadFailed) {
+      if (!busy) setStatus("Saved locally. Cloud upload will retry.");
+    } else if (uploadedCount && currentCapture?.type === "photo") {
+      setStatus("Saved locally and to Drive.");
+    }
+    updateArchiveCount();
   } catch (error) {
     scheduleUploadRetry();
   } finally {
@@ -793,19 +836,6 @@ async function exportArchive() {
     setTimeout(() => URL.revokeObjectURL(url), 5000);
     await new Promise((resolve) => setTimeout(resolve, 220));
   }
-}
-
-function loadUploadEndpoint() {
-  if (!isAdmin) return;
-  els.uploadEndpoint.value = getUploadEndpoint();
-}
-
-function saveUploadEndpoint() {
-  const value = els.uploadEndpoint.value.trim();
-  if (value) localStorage.setItem(UPLOAD_ENDPOINT_KEY, value);
-  else localStorage.removeItem(UPLOAD_ENDPOINT_KEY);
-  setStatus(value ? "Webhook saved on this iPad." : "Webhook removed.");
-  syncArchiveUploads();
 }
 
 function clamp(value, min, max) {
@@ -885,8 +915,6 @@ window.addEventListener("pagehide", () => {
 if (isAdmin) {
   els.adminPanel.classList.remove("hidden");
   els.exportArchive.addEventListener("click", exportArchive);
-  els.saveUploadEndpoint.addEventListener("click", saveUploadEndpoint);
-  loadUploadEndpoint();
   updateArchiveCount();
 }
 

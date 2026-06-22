@@ -19,7 +19,7 @@ To export saved photos, open the app on the same iPad with `?admin=1` at the end
 
 GitHub Pages cannot receive automatic background uploads from the app. A browser-based GitHub upload would require exposing a writable GitHub token to guests, which is not safe.
 
-This build includes a baked-in Google Apps Script webhook that saves each captured photo to Drive in the background. If Wi-Fi drops, the app keeps the local copy and retries cloud upload later when the device is back online. The admin screen can still override the webhook on a specific iPad, but it is no longer required for normal setup.
+This build includes a baked-in Google Apps Script webhook that saves each captured photo to Drive in the background. If Wi-Fi drops or Drive rejects an upload, the app keeps the local copy and retries later. The app verifies Drive's success response before marking a photo uploaded, and no per-iPad webhook setup is required.
 
 ## Sharing
 
