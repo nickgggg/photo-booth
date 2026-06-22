@@ -32,6 +32,7 @@ const STORE_NAME = "photos";
 const DEFAULT_UPLOAD_ENDPOINT = "https://script.google.com/macros/s/AKfycby2mTliV2bwMCL7y_N4RgBidcAF9aNHouUjzp2dTZ8u1yzjnaqqZHEfkn2Xk67BSgbc/exec";
 const UPLOAD_VERIFICATION_KEY = "brixpixVerifiedUploadsV1";
 const UPLOAD_RETRY_MS = 30000;
+const VIDEO_MAX_MS = 30000;
 const isAdmin = (() => {
   const params = new URLSearchParams(location.search);
   if (params.has("admin")) return true;
@@ -47,6 +48,7 @@ const isAdmin = (() => {
 let stream = null;
 let recorder = null;
 let chunks = [];
+let videoStopTimer = null;
 let currentCapture = null;
 let busy = false;
 let selectedFilter = "none";
@@ -216,7 +218,7 @@ async function takePhoto() {
       return;
     }
     const fileName = timestampFileName("jpg");
-    await archivePhoto(blob, fileName);
+    await archiveCapture(blob, fileName);
     showCapture(blob, "photo", fileName);
   }, "image/jpeg", 0.92);
 }
@@ -234,22 +236,27 @@ async function recordVideo() {
   recorder.ondataavailable = (event) => {
     if (event.data.size > 0) chunks.push(event.data);
   };
-  recorder.onstop = () => {
+  recorder.onstop = async () => {
+    clearTimeout(videoStopTimer);
     const blob = new Blob(chunks, { type: recorder.mimeType || "video/webm" });
-    showCapture(blob, "video");
+    const fileName = timestampFileName(videoExtension(blob.type));
     recorder = null;
+    await archiveCapture(blob, fileName);
+    showCapture(blob, "video", fileName);
   };
 
-  recorder.start();
+  recorder.start(1000);
+  videoStopTimer = setTimeout(stopVideo, VIDEO_MAX_MS);
   els.recordVideo.textContent = "Stop";
   els.recordVideo.classList.add("recording");
   els.recordVideo.disabled = false;
-  setStatus("Recording. Tap Stop when done.");
+  setStatus("Recording. Tap Stop, or it stops automatically at 30 seconds.");
 }
 
 function stopVideo() {
-  if (!recorder) return;
-  els.recordVideo.textContent = "Video";
+  if (!recorder || recorder.state !== "recording") return;
+  clearTimeout(videoStopTimer);
+  els.recordVideo.textContent = "🎥";
   els.recordVideo.classList.remove("recording");
   recorder.stop();
   setBusy(true);
@@ -644,7 +651,7 @@ function openArchiveDb() {
   return dbPromise;
 }
 
-async function archivePhoto(blob, fileName = timestampFileName("jpg")) {
+async function archiveCapture(blob, fileName = timestampFileName("jpg")) {
   try {
     const db = await openArchiveDb();
     await new Promise((resolve, reject) => {
@@ -663,7 +670,7 @@ async function archivePhoto(blob, fileName = timestampFileName("jpg")) {
     updateArchiveCount();
     syncArchiveUploads();
   } catch (error) {
-    setStatus("Photo ready. Archive save failed on this browser.");
+    setStatus("Capture ready. Archive save failed on this browser.");
   }
 }
 
@@ -671,7 +678,7 @@ function getUploadEndpoint() {
   return DEFAULT_UPLOAD_ENDPOINT;
 }
 
-async function uploadPhoto(record, endpoint) {
+async function uploadCapture(record, endpoint) {
   try {
     const dataUrl = await blobToDataUrl(record.blob);
     const response = await fetch(endpoint, {
@@ -784,7 +791,7 @@ async function syncArchiveUploads() {
       if (!pending.length) break;
 
       for (const photo of pending) {
-        const ok = await uploadPhoto(photo, endpoint);
+        const ok = await uploadCapture(photo, endpoint);
         if (ok) {
           uploadedCount += 1;
           await updateArchivedPhoto(photo.id, {
@@ -804,7 +811,7 @@ async function syncArchiveUploads() {
 
     if (uploadFailed) {
       if (!busy) setStatus("Saved locally. Cloud upload will retry.");
-    } else if (uploadedCount && currentCapture?.type === "photo") {
+    } else if (uploadedCount && currentCapture) {
       setStatus("Saved locally and to Drive.");
     }
     updateArchiveCount();
