@@ -32,7 +32,9 @@ const els = {
 const DB_NAME = "brixpix-archive";
 const DB_VERSION = 1;
 const STORE_NAME = "photos";
+const DEFAULT_UPLOAD_ENDPOINT = "https://script.google.com/macros/s/AKfycby2mTliV2bwMCL7y_N4RgBidcAF9aNHouUjzp2dTZ8u1yzjnaqqZHEfkn2Xk67BSgbc/exec";
 const UPLOAD_ENDPOINT_KEY = "brixpixUploadEndpoint";
+const UPLOAD_RETRY_MS = 30000;
 const isAdmin = (() => {
   const params = new URLSearchParams(location.search);
   if (params.has("admin")) return true;
@@ -57,6 +59,8 @@ let nextStickerId = 1;
 let dbPromise = null;
 let orientationRestartTimer = null;
 let cameraRotation = 0;
+let uploadSyncInFlight = false;
+let uploadRetryTimer = null;
 const activePointers = new Map();
 let gesture = null;
 
@@ -639,27 +643,31 @@ async function archivePhoto(blob) {
     const db = await openArchiveDb();
     await new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, "readwrite");
-      tx.objectStore(STORE_NAME).add({
+      const request = tx.objectStore(STORE_NAME).add({
         blob,
         createdAt: new Date().toISOString(),
-        fileName: `brixpix-${Date.now()}.jpg`
+        fileName: `brixpix-${Date.now()}.jpg`,
+        uploadedAt: null,
+        uploadAttempts: 0
       });
+      request.onsuccess = resolve;
       tx.oncomplete = resolve;
       tx.onerror = () => reject(tx.error);
     });
     updateArchiveCount();
-    uploadPhoto(blob);
+    syncArchiveUploads();
   } catch (error) {
     setStatus("Photo ready. Archive save failed on this browser.");
   }
 }
 
-async function uploadPhoto(blob) {
-  const endpoint = localStorage.getItem(UPLOAD_ENDPOINT_KEY);
-  if (!endpoint) return;
+function getUploadEndpoint() {
+  return localStorage.getItem(UPLOAD_ENDPOINT_KEY) || DEFAULT_UPLOAD_ENDPOINT;
+}
 
+async function uploadPhoto(record, endpoint) {
   try {
-    const dataUrl = await blobToDataUrl(blob);
+    const dataUrl = await blobToDataUrl(record.blob);
     await fetch(endpoint, {
       method: "POST",
       mode: "no-cors",
@@ -667,13 +675,14 @@ async function uploadPhoto(blob) {
         "Content-Type": "text/plain"
       },
       body: JSON.stringify({
-        fileName: `brixpix-${Date.now()}.jpg`,
-        mimeType: blob.type || "image/jpeg",
+        fileName: record.fileName || `brixpix-${record.id || Date.now()}.jpg`,
+        mimeType: record.blob.type || "image/jpeg",
         dataUrl
       })
     });
+    return true;
   } catch (error) {
-    // Keep upload failures invisible to guests. Local archive still has the photo.
+    return false;
   }
 }
 
@@ -693,6 +702,67 @@ async function getArchivedPhotos() {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
+}
+
+async function updateArchivedPhoto(id, updates) {
+  const db = await openArchiveDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    const store = tx.objectStore(STORE_NAME);
+    const request = store.get(id);
+    request.onsuccess = () => {
+      const photo = request.result;
+      if (!photo) {
+        resolve();
+        return;
+      }
+      store.put({ ...photo, ...updates });
+    };
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+function scheduleUploadRetry() {
+  clearTimeout(uploadRetryTimer);
+  uploadRetryTimer = setTimeout(() => {
+    syncArchiveUploads();
+  }, UPLOAD_RETRY_MS);
+}
+
+async function syncArchiveUploads() {
+  const endpoint = getUploadEndpoint();
+  if (!endpoint || uploadSyncInFlight || !navigator.onLine) {
+    if (endpoint && !navigator.onLine) scheduleUploadRetry();
+    return;
+  }
+
+  uploadSyncInFlight = true;
+
+  try {
+    const archivedPhotos = await getArchivedPhotos();
+    const pending = archivedPhotos.filter((photo) => !photo.uploadedAt);
+
+    for (const photo of pending) {
+      const ok = await uploadPhoto(photo, endpoint);
+      if (ok) {
+        await updateArchivedPhoto(photo.id, {
+          uploadedAt: new Date().toISOString(),
+          uploadAttempts: (photo.uploadAttempts || 0) + 1
+        });
+      } else {
+        await updateArchivedPhoto(photo.id, {
+          uploadAttempts: (photo.uploadAttempts || 0) + 1
+        });
+        scheduleUploadRetry();
+        break;
+      }
+    }
+  } catch (error) {
+    scheduleUploadRetry();
+  } finally {
+    uploadSyncInFlight = false;
+  }
 }
 
 async function updateArchiveCount() {
@@ -727,7 +797,7 @@ async function exportArchive() {
 
 function loadUploadEndpoint() {
   if (!isAdmin) return;
-  els.uploadEndpoint.value = localStorage.getItem(UPLOAD_ENDPOINT_KEY) || "";
+  els.uploadEndpoint.value = getUploadEndpoint();
 }
 
 function saveUploadEndpoint() {
@@ -735,6 +805,7 @@ function saveUploadEndpoint() {
   if (value) localStorage.setItem(UPLOAD_ENDPOINT_KEY, value);
   else localStorage.removeItem(UPLOAD_ENDPOINT_KEY);
   setStatus(value ? "Webhook saved on this iPad." : "Webhook removed.");
+  syncArchiveUploads();
 }
 
 function clamp(value, min, max) {
@@ -802,6 +873,7 @@ window.addEventListener("pointerup", endStickerGesture);
 window.addEventListener("pointercancel", endStickerGesture);
 window.addEventListener("orientationchange", restartCameraForOrientation);
 window.addEventListener("resize", restartCameraForOrientation);
+window.addEventListener("online", syncArchiveUploads);
 if (window.visualViewport) {
   window.visualViewport.addEventListener("resize", restartCameraForOrientation);
 }
@@ -820,3 +892,4 @@ if (isAdmin) {
 
 setBusy(false);
 els.booth.style.setProperty("--camera-rotation", "0deg");
+syncArchiveUploads();

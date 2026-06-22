@@ -15,11 +15,11 @@ Camera access requires HTTPS or localhost. GitHub Pages gives you HTTPS for free
 
 Every photo is silently saved to local IndexedDB inside this web app on the iPad after capture. This is not the iOS Photos app, so saved photos will not appear in Photos automatically. Guests do not see a gallery, and Retake only clears the guest preview; it does not remove the owner archive.
 
-To export saved photos, open the app on the same iPad with `?admin=1` at the end of the URL and use Export Saved Photos. This is local-only and free. Cloud backup would require adding a backend or a service account flow.
+To export saved photos, open the app on the same iPad with `?admin=1` at the end of the URL and use Export Saved Photos.
 
 GitHub Pages cannot receive automatic background uploads from the app. A browser-based GitHub upload would require exposing a writable GitHub token to guests, which is not safe.
 
-For a free cloud-ish backup, deploy a Google Apps Script web app that accepts a plain-text JSON POST with `fileName`, `mimeType`, and `dataUrl`, writes the decoded image to Drive, then paste that web app URL into the admin screen. Open the app with `?admin=1` on the iPad, set the Webhook URL, and future photos will save locally first and then post to the webhook in the background.
+This build includes a baked-in Google Apps Script webhook that saves each captured photo to Drive in the background. If Wi-Fi drops, the app keeps the local copy and retries cloud upload later when the device is back online. The admin screen can still override the webhook on a specific iPad, but it is no longer required for normal setup.
 
 ## Sharing
 
