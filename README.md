@@ -33,7 +33,7 @@ Safari web apps cannot set the iPad's system brightness like Apple Wallet can. A
 
 ## Overlays
 
-Guests can pick a filter, add multiple stickers, drag them around the camera preview, pinch to resize/rotate, and toggle the `BRIXPIX` mark. Photo filters and overlays are burned into downloaded/shared photos. Video uses native browser playback controls for better iOS compatibility.
+Guests can pick a filter, add multiple stickers, drag them around the camera preview, pinch to resize/rotate, and toggle the `BRIXPIX` mark. Filters, stickers, and the watermark are composited into saved photos and videos. Video playback uses native browser controls for better iOS compatibility.
 
 Mac and iOS camera features such as Center Stage can crop or reframe before the browser receives the video. The app itself uses `object-fit: contain` so it does not add another crop on top.
 

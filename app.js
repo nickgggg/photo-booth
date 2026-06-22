@@ -35,6 +35,8 @@ const UPLOAD_RETRY_MS = 30000;
 const VIDEO_MAX_MS = 15000;
 const VIDEO_BITS_PER_SECOND = 2000000;
 const AUDIO_BITS_PER_SECOND = 96000;
+const VIDEO_FRAME_RATE = 15;
+const VIDEO_MAX_WIDTH = 720;
 const isAdmin = (() => {
   const params = new URLSearchParams(location.search);
   if (params.has("admin")) return true;
@@ -51,6 +53,9 @@ let stream = null;
 let recorder = null;
 let chunks = [];
 let videoStopTimer = null;
+let videoRenderFrame = null;
+let videoRenderLastTime = 0;
+let recordingOutputStream = null;
 let currentCapture = null;
 let busy = false;
 let selectedFilter = "none";
@@ -84,6 +89,7 @@ function setBusy(nextBusy) {
 function clearCapture() {
   if (currentCapture) URL.revokeObjectURL(currentCapture.url);
   currentCapture = null;
+  els.stage.classList.remove("has-result");
   els.result.replaceChildren();
   els.result.classList.add("hidden");
   setBusy(false);
@@ -184,6 +190,7 @@ function showCapture(blob, type, fileName = null) {
 
   els.result.replaceChildren(media);
   els.result.classList.remove("hidden");
+  els.stage.classList.add("has-result");
   setStatus(type === "photo" ? "Saved. Share with AirDrop." : "Video ready.");
   setBusy(false);
 }
@@ -202,9 +209,9 @@ async function takePhoto() {
 
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   const captureFilter = filterForCanvas(selectedFilter);
+  const canvasFilterApplied = typeof ctx.filter === "string";
   ctx.save();
-  ctx.filter = captureFilter;
-  const canvasFilterApplied = ctx.filter === captureFilter;
+  if (canvasFilterApplied) ctx.filter = captureFilter;
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
   ctx.restore();
   if (captureFilter !== "none" && !canvasFilterApplied) {
@@ -236,8 +243,10 @@ async function recordVideo() {
   chunks = [];
   const mimeType = pickVideoMimeType();
   try {
-    recorder = createVideoRecorder(mimeType);
+    recordingOutputStream = createCompositedVideoStream();
+    recorder = createVideoRecorder(recordingOutputStream, mimeType);
   } catch (error) {
+    stopVideoCompositor();
     setStatus("Video recording is not available. Refresh and try again.");
     setBusy(false);
     return;
@@ -248,6 +257,7 @@ async function recordVideo() {
   };
   activeRecorder.onerror = () => {
     clearTimeout(videoStopTimer);
+    stopVideoCompositor();
     if (recorder === activeRecorder) recorder = null;
     els.recordVideo.textContent = "🎥";
     els.recordVideo.classList.remove("recording");
@@ -256,6 +266,7 @@ async function recordVideo() {
   };
   activeRecorder.onstop = async () => {
     clearTimeout(videoStopTimer);
+    stopVideoCompositor();
     const blob = new Blob(chunks, { type: activeRecorder.mimeType || "video/webm" });
     const fileName = timestampFileName(videoExtension(blob.type));
     if (recorder === activeRecorder) recorder = null;
@@ -272,7 +283,64 @@ async function recordVideo() {
   setStatus("Recording. Tap Stop, or it stops automatically at 15 seconds.");
 }
 
-function createVideoRecorder(mimeType) {
+function createCompositedVideoStream() {
+  const canvas = els.snapshot;
+  if (typeof canvas.captureStream !== "function") {
+    throw new Error("Canvas video capture is unavailable");
+  }
+
+  const sourceWidth = els.camera.videoWidth || 1280;
+  const sourceHeight = els.camera.videoHeight || 720;
+  const scale = Math.min(1, VIDEO_MAX_WIDTH / sourceWidth);
+  canvas.width = Math.max(2, Math.round((sourceWidth * scale) / 2) * 2);
+  canvas.height = Math.max(2, Math.round((sourceHeight * scale) / 2) * 2);
+
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const frameInterval = 1000 / VIDEO_FRAME_RATE;
+  videoRenderLastTime = 0;
+
+  const renderFrame = (timestamp) => {
+    if (!recordingOutputStream) return;
+    if (!videoRenderLastTime || timestamp - videoRenderLastTime >= frameInterval) {
+      videoRenderLastTime = timestamp;
+      drawCompositedVideoFrame(ctx, canvas.width, canvas.height);
+    }
+    videoRenderFrame = requestAnimationFrame(renderFrame);
+  };
+
+  drawCompositedVideoFrame(ctx, canvas.width, canvas.height);
+  const output = canvas.captureStream(VIDEO_FRAME_RATE);
+  recordingOutputStream = output;
+  stream.getAudioTracks().forEach((track) => output.addTrack(track.clone()));
+  videoRenderFrame = requestAnimationFrame(renderFrame);
+  return output;
+}
+
+function drawCompositedVideoFrame(ctx, width, height) {
+  const captureFilter = filterForCanvas(selectedFilter);
+  const canvasFilterApplied = typeof ctx.filter === "string";
+  ctx.save();
+  if (canvasFilterApplied) ctx.filter = captureFilter;
+  ctx.drawImage(els.camera, 0, 0, width, height);
+  ctx.restore();
+
+  if (captureFilter !== "none" && !canvasFilterApplied) {
+    applyCanvasFilter(ctx, width, height, selectedFilter);
+  }
+  drawPhotoOverlays(ctx, width, height);
+}
+
+function stopVideoCompositor() {
+  if (videoRenderFrame !== null) cancelAnimationFrame(videoRenderFrame);
+  videoRenderFrame = null;
+  videoRenderLastTime = 0;
+  if (recordingOutputStream) {
+    recordingOutputStream.getTracks().forEach((track) => track.stop());
+    recordingOutputStream = null;
+  }
+}
+
+function createVideoRecorder(recordingStream, mimeType) {
   const options = {
     videoBitsPerSecond: VIDEO_BITS_PER_SECOND,
     audioBitsPerSecond: AUDIO_BITS_PER_SECOND
@@ -280,9 +348,9 @@ function createVideoRecorder(mimeType) {
   if (mimeType) options.mimeType = mimeType;
 
   try {
-    return new MediaRecorder(stream, options);
+    return new MediaRecorder(recordingStream, options);
   } catch (error) {
-    return mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+    return mimeType ? new MediaRecorder(recordingStream, { mimeType }) : new MediaRecorder(recordingStream);
   }
 }
 

@@ -66,45 +66,31 @@ body {
   transform-origin: center;
 }
 
-.booth[data-filter="warm"] .camera,
-.booth[data-filter="warm"] .result img,
-.booth[data-filter="warm"] .result video {
+.booth[data-filter="warm"] .camera {
   filter: sepia(0.3) saturate(1.15) contrast(1.08);
 }
 
-.booth[data-filter="flash"] .camera,
-.booth[data-filter="flash"] .result img,
-.booth[data-filter="flash"] .result video {
+.booth[data-filter="flash"] .camera {
   filter: brightness(1.16) contrast(1.22) saturate(1.1);
 }
 
-.booth[data-filter="mono"] .camera,
-.booth[data-filter="mono"] .result img,
-.booth[data-filter="mono"] .result video {
+.booth[data-filter="mono"] .camera {
   filter: grayscale(1) contrast(1.22);
 }
 
-.booth[data-filter="acid"] .camera,
-.booth[data-filter="acid"] .result img,
-.booth[data-filter="acid"] .result video {
+.booth[data-filter="acid"] .camera {
   filter: hue-rotate(95deg) saturate(2.2) contrast(1.28);
 }
 
-.booth[data-filter="disco"] .camera,
-.booth[data-filter="disco"] .result img,
-.booth[data-filter="disco"] .result video {
+.booth[data-filter="disco"] .camera {
   filter: hue-rotate(250deg) saturate(2.3) contrast(1.2) brightness(1.06);
 }
 
-.booth[data-filter="dream"] .camera,
-.booth[data-filter="dream"] .result img,
-.booth[data-filter="dream"] .result video {
+.booth[data-filter="dream"] .camera {
   filter: sepia(0.2) saturate(1.55) hue-rotate(318deg) brightness(1.1);
 }
 
-.booth[data-filter="vhs"] .camera,
-.booth[data-filter="vhs"] .result img,
-.booth[data-filter="vhs"] .result video {
+.booth[data-filter="vhs"] .camera {
   filter: contrast(1.36) saturate(1.65) hue-rotate(180deg);
 }
 
@@ -125,6 +111,10 @@ body {
 .live-overlays,
 .capture-overlays {
   z-index: 2;
+}
+
+.stage.has-result .live-overlays {
+  display: none;
 }
 
 .booth-logo {
