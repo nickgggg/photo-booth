@@ -37,6 +37,10 @@ const VIDEO_BITS_PER_SECOND = 2000000;
 const AUDIO_BITS_PER_SECOND = 96000;
 const VIDEO_FRAME_RATE = 15;
 const VIDEO_MAX_WIDTH = 720;
+const IMAGE_STICKERS = {
+  brickart: { src: "stickers/brick-bn.png", width: 310, aspect: 467 / 373 },
+  nickbrenna: { src: "stickers/nick-brenna.png", width: 310, aspect: 467 / 373 }
+};
 const isAdmin = (() => {
   const params = new URLSearchParams(location.search);
   if (params.has("admin")) return true;
@@ -71,6 +75,14 @@ let uploadRetryTimer = null;
 let uploadPreparationPromise = null;
 const activePointers = new Map();
 let gesture = null;
+const stickerImages = new Map();
+
+Object.entries(IMAGE_STICKERS).forEach(([kind, config]) => {
+  const image = new Image();
+  image.decoding = "async";
+  image.src = config.src;
+  stickerImages.set(kind, image);
+});
 
 function setStatus(message) {
   els.status.textContent = message;
@@ -423,6 +435,7 @@ function rotateCamera(degrees) {
 function addSticker(kind) {
   const stageRect = els.stage.getBoundingClientRect();
   const countOffset = stickers.length % 4;
+  const imageSticker = isImageSticker(kind);
   const sticker = {
     id: nextStickerId,
     kind,
@@ -430,7 +443,7 @@ function addSticker(kind) {
     fill: stickerFill(kind),
     x: 0.5 + countOffset * 0.04,
     y: 0.46 + countOffset * 0.04,
-    scale: emojiSticker(kind) ? 0.72 : 0.72,
+    scale: imageSticker ? 0.9 : 0.72,
     rotation: countOffset % 2 ? 4 : -4
   };
   nextStickerId += 1;
@@ -444,10 +457,19 @@ function renderStickers() {
   els.stickersLayer.replaceChildren();
   stickers.forEach((sticker) => {
     const node = document.createElement("div");
-    node.className = `editable-sticker${emojiSticker(sticker.kind) ? " diamond" : ""}${sticker.id === selectedStickerId ? " selected" : ""}`;
+    node.className = `editable-sticker${emojiSticker(sticker.kind) ? " diamond" : ""}${isImageSticker(sticker.kind) ? " image-sticker" : ""}${sticker.id === selectedStickerId ? " selected" : ""}`;
     node.dataset.stickerId = String(sticker.id);
-    node.textContent = sticker.text;
-    node.style.background = sticker.fill;
+    if (isImageSticker(sticker.kind)) {
+      const image = document.createElement("img");
+      image.src = IMAGE_STICKERS[sticker.kind].src;
+      image.alt = "";
+      image.draggable = false;
+      node.append(image);
+      node.style.setProperty("--sticker-aspect", String(IMAGE_STICKERS[sticker.kind].aspect));
+    } else {
+      node.textContent = sticker.text;
+      node.style.background = sticker.fill;
+    }
     node.style.setProperty("--sticker-x", `${sticker.x * 100}%`);
     node.style.setProperty("--sticker-y", `${sticker.y * 100}%`);
     node.style.setProperty("--sticker-scale", String(sticker.scale));
@@ -658,6 +680,10 @@ function drawLogo(ctx, width, scale) {
 
 function drawSticker(ctx, sticker, centerX, centerY, baseScale) {
   const scale = baseScale * sticker.scale;
+  if (isImageSticker(sticker.kind)) {
+    drawImageSticker(ctx, sticker, centerX, centerY, scale);
+    return;
+  }
   const isEmoji = emojiSticker(sticker.kind);
   const paddingX = (isEmoji ? 12 : 16) * scale;
   ctx.save();
@@ -677,6 +703,19 @@ function drawSticker(ctx, sticker, centerX, centerY, baseScale) {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(sticker.text, 0, isEmoji ? 0 : 2 * scale);
+  ctx.restore();
+}
+
+function drawImageSticker(ctx, sticker, centerX, centerY, scale) {
+  const image = stickerImages.get(sticker.kind);
+  if (!image || !image.complete || !image.naturalWidth) return;
+  const config = IMAGE_STICKERS[sticker.kind];
+  const width = config.width * scale;
+  const height = width / config.aspect;
+  ctx.save();
+  ctx.translate(centerX, centerY);
+  ctx.rotate((sticker.rotation * Math.PI) / 180);
+  ctx.drawImage(image, -width / 2, -height / 2, width, height);
   ctx.restore();
 }
 
@@ -720,6 +759,10 @@ function stickerText(kind) {
   if (kind === "married") return "💒";
   if (kind === "horsefart") return "🐎💨";
   return "";
+}
+
+function isImageSticker(kind) {
+  return Boolean(IMAGE_STICKERS[kind]);
 }
 
 function stickerFill(kind) {

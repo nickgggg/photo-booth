@@ -168,6 +168,24 @@ body {
   font-size: 72px;
 }
 
+.editable-sticker.image-sticker {
+  width: min(310px, 62vw);
+  max-width: none;
+  aspect-ratio: var(--sticker-aspect);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.editable-sticker.image-sticker img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
 .capture-overlays .editable-sticker {
   pointer-events: none;
 }
@@ -523,6 +541,29 @@ select {
 
 .emoji-chip.wide {
   grid-column: span 2;
+}
+
+.image-chip {
+  min-height: 58px !important;
+  overflow: hidden;
+  padding: 3px !important;
+  background: #f8f3e8;
+}
+
+.image-chip img {
+  display: block;
+  width: 100%;
+  height: 50px;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.brick-art-chip {
+  grid-column: span 2;
+}
+
+.nick-brenna-chip {
+  grid-column: span 4;
 }
 
 .finishing-section {
