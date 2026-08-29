@@ -28,8 +28,14 @@
         <div id="countdown" class="countdown hidden" aria-live="assertive"></div>
         <button id="ringLightButton" class="stage-light" type="button" aria-label="Toggle ring light" title="Ring light">⚡</button>
         <div class="stage-capture">
-          <button id="takePhoto" class="shutter photo-shutter" type="button" disabled aria-label="Take photo">📷</button>
-          <button id="recordVideo" class="shutter video-shutter" type="button" disabled aria-label="Record video">🎥</button>
+          <button id="photoBooth" class="capture-mode photo-mode" type="button" disabled>
+            <span class="capture-mode-icon" aria-hidden="true">📷</span>
+            <span>Photo Booth</span>
+          </button>
+          <button id="confessionalMode" class="capture-mode confessional-mode" type="button" disabled>
+            <span class="capture-mode-icon" aria-hidden="true">🎙️</span>
+            <span>Confessional</span>
+          </button>
         </div>
       </section>
 
@@ -164,8 +170,47 @@
           </div>
         </div>
       </section>
+
+      <section id="confessionalPicker" class="confessional-picker hidden" role="dialog" aria-modal="true" aria-labelledby="confessionalPickerTitle">
+        <div class="confessional-picker-sheet">
+          <header class="confessional-picker-header">
+            <div>
+              <p>BRIXPIX CONFESSIONAL</p>
+              <h2 id="confessionalPickerTitle">What do you want to say?</h2>
+            </div>
+            <button id="closeConfessionalPicker" class="picker-close" type="button" aria-label="Close confessional prompts">×</button>
+          </header>
+          <div class="confessional-prompt-grid" role="group" aria-label="Choose a confessional prompt">
+            <button class="confessional-prompt memory" type="button" data-confessional-prompt="Funny or fond memory of Nick and/or Brenna">
+              <span>01</span>
+              <strong>Funny or fond memory</strong>
+              <small>of Nick and/or Brenna</small>
+            </button>
+            <button class="confessional-prompt wishes" type="button" data-confessional-prompt="Best wishes / sendoff">
+              <span>02</span>
+              <strong>Best wishes</strong>
+              <small>or a sendoff for the newlyweds</small>
+            </button>
+            <button class="confessional-prompt freestyle" type="button" data-confessional-prompt="Freestyle">
+              <span>03</span>
+              <strong>Freestyle</strong>
+              <small>keep it on brand</small>
+            </button>
+            <button class="confessional-prompt genuine" type="button" data-confessional-prompt="A genuine message">
+              <span>04</span>
+              <strong>Genuine message</strong>
+              <small>say the sweet thing</small>
+            </button>
+            <button class="confessional-prompt roast" type="button" data-confessional-prompt="Roast">
+              <span>05</span>
+              <strong>Roast</strong>
+              <small>with love, obviously</small>
+            </button>
+          </div>
+        </div>
+      </section>
     </main>
 
-    <script src="app.js?v=20260828-2"></script>
+    <script src="app.js?v=20260828-3"></script>
   </body>
 </html>

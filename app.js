@@ -21,8 +21,10 @@ const els = {
   stickerChoiceCount: document.getElementById("stickerChoiceCount"),
   rotateSticker: document.getElementById("rotateSticker"),
   removeSticker: document.getElementById("removeSticker"),
-  takePhoto: document.getElementById("takePhoto"),
-  recordVideo: document.getElementById("recordVideo"),
+  photoBooth: document.getElementById("photoBooth"),
+  confessionalMode: document.getElementById("confessionalMode"),
+  confessionalPicker: document.getElementById("confessionalPicker"),
+  closeConfessionalPicker: document.getElementById("closeConfessionalPicker"),
   shareCapture: document.getElementById("shareCapture"),
   adminPanel: document.getElementById("adminPanel"),
   exportArchive: document.getElementById("exportArchive"),
@@ -77,6 +79,7 @@ let uploadSyncInFlight = false;
 let uploadSyncRequested = false;
 let uploadRetryTimer = null;
 let uploadPreparationPromise = null;
+let activeConfessionalPrompt = null;
 const activePointers = new Map();
 let gesture = null;
 const stickerImages = new Map();
@@ -98,8 +101,8 @@ function setBusy(nextBusy) {
   busy = nextBusy;
   const hasCamera = Boolean(stream);
   const hasCapture = Boolean(currentCapture);
-  els.takePhoto.disabled = busy || !hasCamera;
-  els.recordVideo.disabled = busy || !hasCamera || !window.MediaRecorder;
+  els.photoBooth.disabled = busy || !hasCamera;
+  els.confessionalMode.disabled = (busy && !(recorder && recorder.state === "recording")) || !hasCamera || !window.MediaRecorder;
   els.shareCapture.disabled = busy || !hasCapture;
   els.startCamera.disabled = busy || hasCamera;
 }
@@ -180,12 +183,12 @@ async function runTimer() {
   els.countdown.classList.add("hidden");
 }
 
-function timestampFileName(extension) {
+function timestampFileName(extension, prefix = "BRIXPIX") {
   const now = new Date();
   const pad = (value, length = 2) => String(value).padStart(length, "0");
   const date = [now.getFullYear(), pad(now.getMonth() + 1), pad(now.getDate())].join("-");
   const time = [pad(now.getHours()), pad(now.getMinutes()), pad(now.getSeconds())].join("-");
-  return `BRIXPIX_${date}_${time}-${pad(now.getMilliseconds(), 3)}.${extension}`;
+  return `${prefix}_${date}_${time}-${pad(now.getMilliseconds(), 3)}.${extension}`;
 }
 
 function showCapture(blob, type, fileName = null) {
@@ -251,10 +254,11 @@ async function takePhoto() {
   }, "image/jpeg", 0.92);
 }
 
-async function recordVideo() {
+async function recordVideo(prompt) {
   if (!stream || busy || !window.MediaRecorder) return;
   clearCapture();
   setBusy(true);
+  activeConfessionalPrompt = prompt;
   setStatus("Get ready.");
   await runTimer();
 
@@ -277,8 +281,9 @@ async function recordVideo() {
     clearTimeout(videoStopTimer);
     stopVideoCompositor();
     if (recorder === activeRecorder) recorder = null;
-    els.recordVideo.textContent = "🎥";
-    els.recordVideo.classList.remove("recording");
+    activeConfessionalPrompt = null;
+    els.confessionalMode.innerHTML = '<span class="capture-mode-icon" aria-hidden="true">🎙️</span><span>Confessional</span>';
+    els.confessionalMode.classList.remove("recording");
     setBusy(false);
     setStatus("Video recording failed. Try again.");
   };
@@ -286,18 +291,19 @@ async function recordVideo() {
     clearTimeout(videoStopTimer);
     stopVideoCompositor();
     const blob = new Blob(chunks, { type: activeRecorder.mimeType || "video/webm" });
-    const fileName = timestampFileName(videoExtension(blob.type));
+    const fileName = timestampFileName(videoExtension(blob.type), "BRIXPIX_CONFESSIONAL");
     if (recorder === activeRecorder) recorder = null;
     const savedLocally = await archiveCapture(blob, fileName);
     showCapture(blob, "video", fileName);
+    activeConfessionalPrompt = null;
     if (!savedLocally) setStatus("Video ready, but local archive save failed.");
   };
 
   activeRecorder.start();
   videoStopTimer = setTimeout(stopVideo, VIDEO_MAX_MS);
-  els.recordVideo.textContent = "Stop";
-  els.recordVideo.classList.add("recording");
-  els.recordVideo.disabled = false;
+  els.confessionalMode.textContent = "Stop Recording";
+  els.confessionalMode.classList.add("recording");
+  els.confessionalMode.disabled = false;
   setStatus("Recording. Tap Stop, or it stops automatically at 15 seconds.");
 }
 
@@ -346,6 +352,7 @@ function drawCompositedVideoFrame(ctx, width, height) {
     applyCanvasFilter(ctx, width, height, selectedFilter);
   }
   drawPhotoOverlays(ctx, width, height);
+  if (activeConfessionalPrompt) drawConfessionalPrompt(ctx, width, height, activeConfessionalPrompt);
 }
 
 function stopVideoCompositor() {
@@ -375,8 +382,8 @@ function createVideoRecorder(recordingStream, mimeType) {
 function stopVideo() {
   if (!recorder || recorder.state !== "recording") return;
   clearTimeout(videoStopTimer);
-  els.recordVideo.textContent = "🎥";
-  els.recordVideo.classList.remove("recording");
+  els.confessionalMode.innerHTML = '<span class="capture-mode-icon" aria-hidden="true">🎙️</span><span>Confessional</span>';
+  els.confessionalMode.classList.remove("recording");
   recorder.stop();
   setBusy(true);
   setStatus("Saving video.");
@@ -471,6 +478,19 @@ function closeStickerPicker(returnFocus = true) {
   els.stickerPicker.classList.add("hidden");
   els.openStickerPicker.setAttribute("aria-expanded", "false");
   if (returnFocus) els.openStickerPicker.focus();
+}
+
+function openConfessionalPicker() {
+  if (!stream || busy) return;
+  closeStickerPicker(false);
+  els.confessionalPicker.classList.remove("hidden");
+  els.closeConfessionalPicker.focus();
+}
+
+function closeConfessionalPicker(returnFocus = true) {
+  if (els.confessionalPicker.classList.contains("hidden")) return;
+  els.confessionalPicker.classList.add("hidden");
+  if (returnFocus) els.confessionalMode.focus();
 }
 
 function renderStickers() {
@@ -672,6 +692,31 @@ function drawPhotoOverlays(ctx, width, height) {
     const point = stickerCanvasPoint(sticker, width, height);
     drawSticker(ctx, sticker, point.x, point.y, scale);
   });
+}
+
+function drawConfessionalPrompt(ctx, width, height, prompt) {
+  const scale = Math.max(1, width / 1280);
+  const margin = 34 * scale;
+  const boxHeight = 120 * scale;
+  const x = margin;
+  const y = height - boxHeight - margin;
+  const boxWidth = width - margin * 2;
+  ctx.save();
+  ctx.fillStyle = "rgba(248, 243, 232, 0.94)";
+  ctx.strokeStyle = "#171310";
+  ctx.lineWidth = 3 * scale;
+  rectPath(ctx, x, y, boxWidth, boxHeight);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#b91f55";
+  ctx.font = `700 ${14 * scale}px Arial, Helvetica, sans-serif`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText("BRIXPIX CONFESSIONAL", x + 20 * scale, y + 28 * scale);
+  ctx.fillStyle = "#171310";
+  ctx.font = `italic ${30 * scale}px Georgia, Times New Roman, serif`;
+  ctx.fillText(prompt, x + 20 * scale, y + 76 * scale);
+  ctx.restore();
 }
 
 function drawLogo(ctx, width, scale) {
@@ -1062,10 +1107,10 @@ els.rotateCameraRight.addEventListener("click", () => rotateCamera(90));
 els.stage.addEventListener("click", (event) => {
   if (!stream && event.target === els.camera) startCamera();
 });
-els.takePhoto.addEventListener("click", takePhoto);
-els.recordVideo.addEventListener("click", () => {
+els.photoBooth.addEventListener("click", takePhoto);
+els.confessionalMode.addEventListener("click", () => {
   if (recorder && recorder.state === "recording") stopVideo();
-  else recordVideo();
+  else openConfessionalPicker();
 });
 els.shareCapture.addEventListener("click", shareCapture);
 els.ringLightButton.addEventListener("click", toggleRingLight);
@@ -1075,7 +1120,20 @@ els.stickerPicker.addEventListener("click", (event) => {
   if (event.target === els.stickerPicker) closeStickerPicker();
 });
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") closeStickerPicker();
+  if (event.key === "Escape") {
+    closeStickerPicker();
+    closeConfessionalPicker();
+  }
+});
+els.closeConfessionalPicker.addEventListener("click", () => closeConfessionalPicker());
+els.confessionalPicker.addEventListener("click", (event) => {
+  if (event.target === els.confessionalPicker) closeConfessionalPicker();
+});
+document.querySelectorAll("[data-confessional-prompt]").forEach((button) => {
+  button.addEventListener("click", () => {
+    closeConfessionalPicker(false);
+    recordVideo(button.dataset.confessionalPrompt);
+  });
 });
 els.logoOverlay.addEventListener("change", () => {
   els.booth.dataset.logo = els.logoOverlay.checked ? "on" : "off";
