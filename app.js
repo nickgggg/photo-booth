@@ -318,9 +318,12 @@ function createCompositedVideoStream() {
 
   const sourceWidth = els.camera.videoWidth || 1280;
   const sourceHeight = els.camera.videoHeight || 720;
-  const scale = Math.min(1, VIDEO_MAX_WIDTH / sourceWidth);
-  canvas.width = Math.max(2, Math.round((sourceWidth * scale) / 2) * 2);
-  canvas.height = Math.max(2, Math.round((sourceHeight * scale) / 2) * 2);
+  const stageRect = els.stage.getBoundingClientRect();
+  const frameWidth = stageRect.width || sourceWidth;
+  const frameHeight = stageRect.height || sourceHeight;
+  const scale = Math.min(1, VIDEO_MAX_WIDTH / Math.max(frameWidth, frameHeight));
+  canvas.width = Math.max(2, Math.round((frameWidth * scale) / 2) * 2);
+  canvas.height = Math.max(2, Math.round((frameHeight * scale) / 2) * 2);
 
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   const frameInterval = 1000 / VIDEO_FRAME_RATE;
@@ -344,17 +347,25 @@ function createCompositedVideoStream() {
 }
 
 function drawCompositedVideoFrame(ctx, width, height) {
+  const videoRect = mediaDisplayRect(
+    width,
+    height,
+    els.camera.videoWidth || width,
+    els.camera.videoHeight || height
+  );
   const captureFilter = filterForCanvas(selectedFilter);
   const canvasFilterApplied = typeof ctx.filter === "string";
+  ctx.fillStyle = "#090909";
+  ctx.fillRect(0, 0, width, height);
   ctx.save();
   if (canvasFilterApplied) ctx.filter = captureFilter;
-  ctx.drawImage(els.camera, 0, 0, width, height);
+  ctx.drawImage(els.camera, videoRect.x, videoRect.y, videoRect.width, videoRect.height);
   ctx.restore();
 
   if (captureFilter !== "none" && !canvasFilterApplied) {
     applyCanvasFilter(ctx, width, height, selectedFilter);
   }
-  drawPhotoOverlays(ctx, width, height);
+  drawPhotoOverlays(ctx, width, height, true);
   if (activeConfessionalPrompt) drawConfessionalPrompt(ctx, width, height, activeConfessionalPrompt);
 }
 
@@ -709,37 +720,39 @@ function filterForCanvas(filterName) {
   return "none";
 }
 
-function drawPhotoOverlays(ctx, width, height) {
+function drawPhotoOverlays(ctx, width, height, matchStage = false) {
   const scale = Math.max(1, width / 1280);
   if (els.logoOverlay.checked) drawLogo(ctx, width, scale);
   stickers.forEach((sticker) => {
-    const point = stickerCanvasPoint(sticker, width, height);
+    const point = matchStage
+      ? { x: sticker.x * width, y: sticker.y * height }
+      : stickerCanvasPoint(sticker, width, height);
     drawSticker(ctx, sticker, point.x, point.y, scale);
   });
 }
 
 function drawConfessionalPrompt(ctx, width, height, prompt) {
-  const scale = Math.max(1, width / 1280);
-  const margin = 34 * scale;
-  const boxHeight = 120 * scale;
+  const scale = Math.max(0.75, Math.min(width / 1280, height / 720));
+  const margin = 20 * scale;
+  const boxHeight = 68 * scale;
   const x = margin;
   const y = height - boxHeight - margin;
   const boxWidth = width - margin * 2;
   ctx.save();
   ctx.fillStyle = "rgba(248, 243, 232, 0.94)";
   ctx.strokeStyle = "#171310";
-  ctx.lineWidth = 3 * scale;
+  ctx.lineWidth = 2 * scale;
   rectPath(ctx, x, y, boxWidth, boxHeight);
   ctx.fill();
   ctx.stroke();
   ctx.fillStyle = "#b91f55";
-  ctx.font = `700 ${14 * scale}px Arial, Helvetica, sans-serif`;
+  ctx.font = `700 ${10 * scale}px Arial, Helvetica, sans-serif`;
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  ctx.fillText("BRIXPIX CONFESSIONAL", x + 20 * scale, y + 28 * scale);
+  ctx.fillText("BRIXPIX CONFESSIONAL", x + 14 * scale, y + 20 * scale);
   ctx.fillStyle = "#171310";
-  ctx.font = `italic ${30 * scale}px Georgia, Times New Roman, serif`;
-  ctx.fillText(prompt, x + 20 * scale, y + 76 * scale);
+  ctx.font = `italic ${24 * scale}px Georgia, Times New Roman, serif`;
+  ctx.fillText(prompt, x + 14 * scale, y + 48 * scale);
   ctx.restore();
 }
 
