@@ -46,7 +46,9 @@ const VIDEO_MAX_WIDTH = 720;
 const IMAGE_STICKERS = {
   brickart: { src: "stickers/brick-bn.png", width: 310, aspect: 467 / 373 },
   nickbrenna: { src: "stickers/nick-brenna.png", width: 310, aspect: 467 / 373 },
-  huntingtonbeach: { src: "stickers/huntington-beach.png", width: 340, aspect: 1500 / 1300 }
+  huntingtonbeach: { src: "stickers/huntington-beach.png", width: 340, aspect: 1500 / 1300 },
+  norbitcutout: { src: "stickers/norbit-cutout.png", width: 285, aspect: 1206 / 1305 },
+  cat: { src: "stickers/cat.png", width: 250, aspect: 1903 / 2095 }
 };
 const isAdmin = (() => {
   const params = new URLSearchParams(location.search);
