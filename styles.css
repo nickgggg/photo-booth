@@ -265,6 +265,7 @@ body {
   line-height: 1;
   box-shadow: 0 0 0 3px var(--ink), 0 7px 22px rgba(0, 0, 0, 0.38);
   pointer-events: auto;
+  touch-action: manipulation;
 }
 
 .capture-mode-icon {

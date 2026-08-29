@@ -45,7 +45,8 @@ const VIDEO_FRAME_RATE = 15;
 const VIDEO_MAX_WIDTH = 720;
 const IMAGE_STICKERS = {
   brickart: { src: "stickers/brick-bn.png", width: 310, aspect: 467 / 373 },
-  nickbrenna: { src: "stickers/nick-brenna.png", width: 310, aspect: 467 / 373 }
+  nickbrenna: { src: "stickers/nick-brenna.png", width: 310, aspect: 467 / 373 },
+  huntingtonbeach: { src: "stickers/huntington-beach.png", width: 340, aspect: 1500 / 1300 }
 };
 const isAdmin = (() => {
   const params = new URLSearchParams(location.search);
@@ -101,8 +102,8 @@ function setBusy(nextBusy) {
   busy = nextBusy;
   const hasCamera = Boolean(stream);
   const hasCapture = Boolean(currentCapture);
-  els.photoBooth.disabled = busy || !hasCamera;
-  els.confessionalMode.disabled = (busy && !(recorder && recorder.state === "recording")) || !hasCamera || !window.MediaRecorder;
+  els.photoBooth.disabled = busy;
+  els.confessionalMode.disabled = (busy && !(recorder && recorder.state === "recording")) || !window.MediaRecorder;
   els.shareCapture.disabled = busy || !hasCapture;
   els.startCamera.disabled = busy || hasCamera;
 }
@@ -491,6 +492,27 @@ function closeConfessionalPicker(returnFocus = true) {
   if (els.confessionalPicker.classList.contains("hidden")) return;
   els.confessionalPicker.classList.add("hidden");
   if (returnFocus) els.confessionalMode.focus();
+}
+
+async function handlePhotoBooth() {
+  if (!stream) {
+    await startCamera();
+    return;
+  }
+  takePhoto();
+}
+
+async function handleConfessionalMode() {
+  if (recorder && recorder.state === "recording") {
+    stopVideo();
+    return;
+  }
+  if (!stream) {
+    await startCamera();
+    if (stream) openConfessionalPicker();
+    return;
+  }
+  openConfessionalPicker();
 }
 
 function renderStickers() {
@@ -1107,11 +1129,8 @@ els.rotateCameraRight.addEventListener("click", () => rotateCamera(90));
 els.stage.addEventListener("click", (event) => {
   if (!stream && event.target === els.camera) startCamera();
 });
-els.photoBooth.addEventListener("click", takePhoto);
-els.confessionalMode.addEventListener("click", () => {
-  if (recorder && recorder.state === "recording") stopVideo();
-  else openConfessionalPicker();
-});
+els.photoBooth.addEventListener("click", handlePhotoBooth);
+els.confessionalMode.addEventListener("click", handleConfessionalMode);
 els.shareCapture.addEventListener("click", shareCapture);
 els.ringLightButton.addEventListener("click", toggleRingLight);
 els.openStickerPicker.addEventListener("click", openStickerPicker);
