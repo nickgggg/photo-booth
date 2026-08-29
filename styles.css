@@ -543,6 +543,39 @@ select {
   grid-column: span 2;
 }
 
+.sticker-launcher {
+  width: 100%;
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border-color: var(--ink);
+  background: #f7d6e4;
+  color: var(--ink);
+  text-align: left;
+}
+
+.sticker-launcher > span:first-child {
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+  font-size: 18px;
+  letter-spacing: 0;
+}
+
+.sticker-launcher strong {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 16px;
+  font-style: italic;
+}
+
+.sticker-launcher-count {
+  color: var(--pink-dark);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
 .image-chip {
   min-height: 58px !important;
   overflow: hidden;
@@ -564,6 +597,107 @@ select {
 
 .nick-brenna-chip {
   grid-column: span 4;
+}
+
+.sticker-picker {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  background: rgba(22, 19, 19, 0.62);
+  backdrop-filter: blur(4px);
+}
+
+.sticker-picker-sheet {
+  width: min(620px, 100%);
+  max-height: min(760px, calc(100dvh - 40px));
+  overflow: auto;
+  padding: 20px;
+  border: 4px double var(--ink);
+  background:
+    radial-gradient(rgba(22, 19, 19, 0.035) 0.8px, transparent 0.8px),
+    var(--paper);
+  background-size: 5px 5px;
+  box-shadow: 10px 10px 0 var(--pink-dark);
+  -webkit-overflow-scrolling: touch;
+}
+
+.sticker-picker-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding-bottom: 13px;
+  border-bottom: 2px solid var(--ink);
+}
+
+.sticker-picker-header p {
+  margin: 0 0 5px;
+  color: var(--pink-dark);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.sticker-picker-header h2 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 30px;
+  font-style: italic;
+  line-height: 1;
+}
+
+.picker-close {
+  flex: 0 0 auto;
+  width: 42px;
+  min-height: 42px;
+  padding: 0;
+  border-radius: 50%;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 28px;
+}
+
+.sticker-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(102px, 1fr));
+  gap: 10px;
+}
+
+.picker-sticker {
+  min-height: 84px;
+  padding: 8px;
+  border-width: 2px;
+  background: var(--paper);
+  box-shadow: 3px 3px 0 rgba(22, 19, 19, 0.18);
+}
+
+.sticker-picker-grid .word-sticker {
+  grid-column: auto;
+  font-size: 13px;
+}
+
+.emoji-picker-sticker {
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+  font-size: 36px;
+}
+
+.picker-image-sticker {
+  padding: 4px;
+}
+
+.picker-image-sticker img {
+  display: block;
+  width: 100%;
+  height: 72px;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.picker-image-wide {
+  grid-column: span 2;
 }
 
 .finishing-section {
@@ -755,6 +889,30 @@ select {
   .booth-logo {
     bottom: 116px;
     font-size: 24px;
+  }
+
+  .sticker-picker {
+    align-items: end;
+    padding: 12px 0 0;
+  }
+
+  .sticker-picker-sheet {
+    width: 100%;
+    max-height: min(78dvh, 760px);
+    padding: 18px 14px max(18px, env(safe-area-inset-bottom));
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    box-shadow: 0 -7px 0 var(--pink-dark);
+  }
+
+  .sticker-picker-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .picker-sticker {
+    min-height: 76px;
   }
 }
 

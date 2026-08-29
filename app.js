@@ -15,6 +15,10 @@ const els = {
   rotateCameraRight: document.getElementById("rotateCameraRight"),
   ringLightButton: document.getElementById("ringLightButton"),
   logoOverlay: document.getElementById("logoOverlay"),
+  openStickerPicker: document.getElementById("openStickerPicker"),
+  closeStickerPicker: document.getElementById("closeStickerPicker"),
+  stickerPicker: document.getElementById("stickerPicker"),
+  stickerChoiceCount: document.getElementById("stickerChoiceCount"),
   rotateSticker: document.getElementById("rotateSticker"),
   removeSticker: document.getElementById("removeSticker"),
   takePhoto: document.getElementById("takePhoto"),
@@ -83,6 +87,8 @@ Object.entries(IMAGE_STICKERS).forEach(([kind, config]) => {
   image.src = config.src;
   stickerImages.set(kind, image);
 });
+
+els.stickerChoiceCount.textContent = `${document.querySelectorAll("#stickerPicker [data-sticker-choice]").length} choices`;
 
 function setStatus(message) {
   els.status.textContent = message;
@@ -450,7 +456,21 @@ function addSticker(kind) {
   stickers.push(sticker);
   selectedStickerId = sticker.id;
   renderStickers();
+  closeStickerPicker(false);
   setStatus(stageRect.width ? "Drag sticker. Pinch to resize/rotate." : "Sticker added.");
+}
+
+function openStickerPicker() {
+  els.stickerPicker.classList.remove("hidden");
+  els.openStickerPicker.setAttribute("aria-expanded", "true");
+  els.closeStickerPicker.focus();
+}
+
+function closeStickerPicker(returnFocus = true) {
+  if (els.stickerPicker.classList.contains("hidden")) return;
+  els.stickerPicker.classList.add("hidden");
+  els.openStickerPicker.setAttribute("aria-expanded", "false");
+  if (returnFocus) els.openStickerPicker.focus();
 }
 
 function renderStickers() {
@@ -1049,6 +1069,14 @@ els.recordVideo.addEventListener("click", () => {
 });
 els.shareCapture.addEventListener("click", shareCapture);
 els.ringLightButton.addEventListener("click", toggleRingLight);
+els.openStickerPicker.addEventListener("click", openStickerPicker);
+els.closeStickerPicker.addEventListener("click", () => closeStickerPicker());
+els.stickerPicker.addEventListener("click", (event) => {
+  if (event.target === els.stickerPicker) closeStickerPicker();
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeStickerPicker();
+});
 els.logoOverlay.addEventListener("change", () => {
   els.booth.dataset.logo = els.logoOverlay.checked ? "on" : "off";
 });

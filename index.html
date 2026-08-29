@@ -13,7 +13,7 @@
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="apple-touch-icon" href="icons/brixpix-apple-touch-icon.png">
     <link rel="icon" href="icons/brixpix-icon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="styles.css?v=20260621-3">
+    <link rel="stylesheet" href="styles.css?v=20260828-1">
   </head>
   <body>
     <main class="booth" data-ring="off" data-filter="none" data-logo="on">
@@ -91,24 +91,13 @@
           <div class="control-section overlay-panel sticker-panel">
             <div class="section-heading">
               <div class="mini-label">Stickers</div>
-              <span>Add as many as you like</span>
+              <span>Make it yours</span>
             </div>
-            <div class="chip-row stickers" role="group" aria-label="Add sticker">
-              <button class="chip word-sticker pink" type="button" data-sticker-choice="norbit">NORBITLUVR</button>
-              <button class="chip word-sticker cyan" type="button" data-sticker-choice="brickdup">BRICKDUP</button>
-              <button class="chip word-sticker yellow" type="button" data-sticker-choice="congrats">CONGRATS</button>
-              <button class="chip emoji-chip" type="button" data-sticker-choice="diamond">💎</button>
-              <button class="chip emoji-chip" type="button" data-sticker-choice="ring">💍</button>
-              <button class="chip emoji-chip" type="button" data-sticker-choice="taco">🌮</button>
-              <button class="chip emoji-chip" type="button" data-sticker-choice="married">💒</button>
-              <button class="chip emoji-chip wide" type="button" data-sticker-choice="horsefart">🐎💨</button>
-              <button class="chip image-chip brick-art-chip" type="button" data-sticker-choice="brickart" aria-label="Flaming brick sticker">
-                <img src="stickers/brick-bn.png" alt="">
-              </button>
-              <button class="chip image-chip nick-brenna-chip" type="button" data-sticker-choice="nickbrenna" aria-label="Nick and Brenna sticker">
-                <img src="stickers/nick-brenna.png" alt="">
-              </button>
-            </div>
+            <button id="openStickerPicker" class="sticker-launcher" type="button" aria-expanded="false" aria-controls="stickerPicker">
+              <span aria-hidden="true">✦ 💎 🧱</span>
+              <strong>Add sticker</strong>
+              <span id="stickerChoiceCount" class="sticker-launcher-count">Stickers</span>
+            </button>
           </div>
 
           <div class="control-section finishing-section">
@@ -146,8 +135,37 @@
           <button id="shareCapture" type="button" disabled>Share Latest Capture</button>
         </footer>
       </section>
+
+      <section id="stickerPicker" class="sticker-picker hidden" role="dialog" aria-modal="true" aria-labelledby="stickerPickerTitle">
+        <div class="sticker-picker-sheet">
+          <header class="sticker-picker-header">
+            <div>
+              <p>BRIXPIX STICKER BAR</p>
+              <h2 id="stickerPickerTitle">Pick a sticker</h2>
+            </div>
+            <button id="closeStickerPicker" class="picker-close" type="button" aria-label="Close sticker picker">×</button>
+          </header>
+
+          <div class="sticker-picker-grid" role="group" aria-label="Choose a sticker">
+            <button class="picker-sticker word-sticker pink" type="button" data-sticker-choice="norbit">NORBITLUVR</button>
+            <button class="picker-sticker word-sticker cyan" type="button" data-sticker-choice="brickdup">BRICKDUP</button>
+            <button class="picker-sticker word-sticker yellow" type="button" data-sticker-choice="congrats">CONGRATS</button>
+            <button class="picker-sticker emoji-picker-sticker" type="button" data-sticker-choice="diamond">💎</button>
+            <button class="picker-sticker emoji-picker-sticker" type="button" data-sticker-choice="ring">💍</button>
+            <button class="picker-sticker emoji-picker-sticker" type="button" data-sticker-choice="taco">🌮</button>
+            <button class="picker-sticker emoji-picker-sticker" type="button" data-sticker-choice="married">💒</button>
+            <button class="picker-sticker emoji-picker-sticker" type="button" data-sticker-choice="horsefart">🐎💨</button>
+            <button class="picker-sticker picker-image-sticker" type="button" data-sticker-choice="brickart" aria-label="Flaming brick sticker">
+              <img src="stickers/brick-bn.png" alt="">
+            </button>
+            <button class="picker-sticker picker-image-sticker picker-image-wide" type="button" data-sticker-choice="nickbrenna" aria-label="Nick and Brenna sticker">
+              <img src="stickers/nick-brenna.png" alt="">
+            </button>
+          </div>
+        </div>
+      </section>
     </main>
 
-    <script src="app.js?v=20260828-1"></script>
+    <script src="app.js?v=20260828-2"></script>
   </body>
 </html>
