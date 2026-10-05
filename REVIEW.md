@@ -1,6 +1,6 @@
 # Design and code review
 
-The guest workflow is now camera → capture → share or another capture, with a separate reset for the next guest. The camera preview remains the largest element. Controls use action names, without decorative headings, section dividers or hidden scrolling.
+The guest workflow is now camera → capture → share or another capture, with a separate reset for the next guest. The camera preview spans the full iPad width above a condensed control strip in landscape. Portrait controls use two compact rows. The branding header and decorative side-panel content were removed to reclaim camera space. Controls use action names, without decorative headings, section dividers or hidden scrolling.
 
 ## Remediated
 
@@ -9,13 +9,13 @@ The guest workflow is now camera → capture → share or another capture, with 
 - Stickers use direct manipulation: drag, pinch, attached delete/rotate controls and a resize/rotate handle. Keyboard movement, resizing and removal are supported. Changing selection preserves pointer capture.
 - Rotation applies to preview, saved photos and video. Overlay coordinates and sizes use the displayed camera frame, so letterboxing no longer moves/clamps stickers unexpectedly. The saved watermark matches the live brick2026 mark.
 - Resize changes geometry without restarting the camera or deleting the latest capture. Screen wake lock is requested where supported.
-- Filters show actual camera thumbnails. Thumbnail work is throttled and paused during capture/recording; video rendering retains its 15 fps and 720 px cap.
+- Filters are larger color tiles with accessible names and no visible text. Live thumbnail rendering was removed; video rendering retains its 15 fps and 720 px cap.
 - Light fades inward without a solid border, over 89.6 px (1.6 × the old 56 px border). The setting stays on between captures.
 - Capture/countdown locks conflicting controls. Recording shows elapsed time, supports explicit stop and stops automatically at 15 seconds. Recorder/microphone/compositor resources are released on stop or failure.
 - Share uses native file sharing, then a download fallback. Archive errors remain visible instead of being overwritten by a success message.
 - Upload/export read one archive blob at a time; counts use IndexedDB count instead of loading all media. Uploads time out, stop a failed batch after its first failed destination call, retry later and require `ok: true` before marking a capture uploaded. Database and queue preparation can recover after a failed attempt.
 - Picker dialogs isolate background controls, trap keyboard focus and restore focus on dismissal. Filter/light/selection state is exposed to assistive technology.
-- Every original sticker asset, sticker choice, event name/date and video prompt value is preserved.
+- All custom artwork and video prompt values are preserved. Taco, church, horse and ring emoji choices were removed; the diamond has no background or border in the preview or captured media.
 
 ## Validation
 
@@ -30,4 +30,4 @@ The guest workflow is now camera → capture → share or another capture, with 
 
 ## Design research
 
-The publicly available [frontend design guidance](https://github.com/anthropics/skills/blob/main/skills/frontend-design/SKILL.md) identifies repetitive AI design examples: cream-and-serif layouts, rounded card kits, ornamental gradients, numbered nonsequential items, eyebrow labels and generic copy. The redesign avoids these as a template: restrained neutral camera chrome, the existing BRIXPIX pink accent, functional camera thumbnails, custom wedding artwork and plain control labels. Gradients are limited to the requested screen-light falloff. Search and Nielsen Norman Group article access were blocked by the environment's network policy; no findings from those pages are claimed.
+The publicly available [frontend design guidance](https://github.com/anthropics/skills/blob/main/skills/frontend-design/SKILL.md) identifies repetitive AI design examples: cream-and-serif layouts, rounded card kits, ornamental gradients, numbered nonsequential items, eyebrow labels and generic copy. The redesign avoids these as a template: restrained neutral camera chrome, the existing BRIXPIX pink accent, functional color controls, custom wedding artwork and plain control labels. Gradients are limited to the requested screen-light falloff. Search and Nielsen Norman Group article access were blocked by the environment's network policy; no findings from those pages are claimed.

@@ -16,7 +16,7 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="apple-touch-icon" href="icons/brixpix-apple-touch-icon.png" />
     <link rel="icon" href="icons/brixpix-icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=20261005-1" />
+    <link rel="stylesheet" href="styles.css?v=20261005-2" />
   </head>
   <body>
     <svg
@@ -45,24 +45,21 @@
     </svg>
 
     <main class="booth" data-ring="off" data-filter="none" data-logo="on">
-      <header class="topbar">
-        <div class="brand"><span class="brand-name">BRIXPIX</span></div>
-        <div class="event-title">
-          Nick &amp; Brenna <span>10 · 10 · 26</span>
-        </div>
-        <button id="refreshApp" class="quiet-button" type="button">
-          <svg class="icon" aria-hidden="true">
-            <use href="#icon-refresh"></use>
-          </svg>
-          Refresh
-        </button>
-      </header>
-
       <section
         id="stage"
         class="stage"
         aria-label="Camera preview and capture result"
       >
+        <button
+          id="refreshApp"
+          class="quiet-button stage-refresh"
+          type="button"
+        >
+          <svg class="icon" aria-hidden="true">
+            <use href="#icon-refresh"></use>
+          </svg>
+          Refresh
+        </button>
         <video id="camera" class="camera" autoplay playsinline muted></video>
         <canvas id="snapshot" class="hidden"></canvas>
         <div id="liveOverlays" class="live-overlays">
@@ -140,125 +137,72 @@
       </section>
 
       <aside class="controls" aria-label="Photo booth controls">
-        <div class="controls-intro">
-          <h1>brick2026</h1>
-          <p>B + N · October 10, 2026</p>
-        </div>
         <div class="filter-panel">
-          <span class="control-label" id="filterLabel">Filter</span>
-          <div class="filters" role="group" aria-labelledby="filterLabel">
+          <div class="filters" role="group" aria-label="Filters">
             <button
-              class="filter selected"
+              class="filter clean selected"
               type="button"
               data-filter-choice="none"
+              aria-label="Clean"
+              title="Clean"
               aria-pressed="true"
-            >
-              <canvas
-                class="filter-swatch clean"
-                width="96"
-                height="96"
-                aria-hidden="true"
-              ></canvas
-              >Clean
-            </button>
+            ></button>
             <button
-              class="filter"
+              class="filter warm"
               type="button"
               data-filter-choice="warm"
+              aria-label="Golden"
+              title="Golden"
               aria-pressed="false"
-            >
-              <canvas
-                class="filter-swatch warm"
-                width="96"
-                height="96"
-                aria-hidden="true"
-              ></canvas
-              >Golden
-            </button>
+            ></button>
             <button
-              class="filter"
+              class="filter flash"
               type="button"
               data-filter-choice="flash"
+              aria-label="Flash"
+              title="Flash"
               aria-pressed="false"
-            >
-              <canvas
-                class="filter-swatch flash"
-                width="96"
-                height="96"
-                aria-hidden="true"
-              ></canvas
-              >Flash
-            </button>
+            ></button>
             <button
-              class="filter"
+              class="filter mono"
               type="button"
               data-filter-choice="mono"
+              aria-label="Black and white"
+              title="Black and white"
               aria-pressed="false"
-            >
-              <canvas
-                class="filter-swatch mono"
-                width="96"
-                height="96"
-                aria-hidden="true"
-              ></canvas
-              >B&amp;W
-            </button>
+            ></button>
             <button
-              class="filter"
+              class="filter acid"
               type="button"
               data-filter-choice="acid"
+              aria-label="Acid"
+              title="Acid"
               aria-pressed="false"
-            >
-              <canvas
-                class="filter-swatch acid"
-                width="96"
-                height="96"
-                aria-hidden="true"
-              ></canvas
-              >Acid
-            </button>
+            ></button>
             <button
-              class="filter"
+              class="filter disco"
               type="button"
               data-filter-choice="disco"
+              aria-label="Disco"
+              title="Disco"
               aria-pressed="false"
-            >
-              <canvas
-                class="filter-swatch disco"
-                width="96"
-                height="96"
-                aria-hidden="true"
-              ></canvas
-              >Disco
-            </button>
+            ></button>
             <button
-              class="filter"
+              class="filter dream"
               type="button"
               data-filter-choice="dream"
+              aria-label="Dream"
+              title="Dream"
               aria-pressed="false"
-            >
-              <canvas
-                class="filter-swatch dream"
-                width="96"
-                height="96"
-                aria-hidden="true"
-              ></canvas
-              >Dream
-            </button>
+            ></button>
             <button
-              class="filter"
+              class="filter vhs"
               type="button"
               data-filter-choice="vhs"
+              aria-label="VHS"
+              title="VHS"
               aria-pressed="false"
-            >
-              <canvas
-                class="filter-swatch vhs"
-                width="96"
-                height="96"
-                aria-hidden="true"
-              ></canvas
-              >VHS
-            </button>
+            ></button>
           </div>
         </div>
         <button
@@ -273,7 +217,7 @@
             src="stickers/brick-bn.png"
             alt=""
           /><span
-            >Add stickers<small id="stickerChoiceCount">13 choices</small></span
+            >Add stickers<small id="stickerChoiceCount">9 choices</small></span
           ><span aria-hidden="true">＋</span>
         </button>
         <div class="settings-row">
@@ -310,21 +254,16 @@
           </div>
         </div>
         <label class="watermark-toggle"
-          ><span>brick2026 watermark</span
-          ><input id="logoOverlay" type="checkbox" checked /><span
-            class="switch"
-            aria-hidden="true"
-          ></span
+          ><span>Watermark</span
+          ><input
+            id="logoOverlay"
+            type="checkbox"
+            aria-label="brick2026 watermark"
+            checked /><span class="switch" aria-hidden="true"></span
         ></label>
         <div id="adminPanel" class="admin-panel hidden">
           <button id="exportArchive" type="button">Export archive</button
           ><span id="archiveCount">0 saved</span>
-        </div>
-        <div class="controls-note">
-          <img
-            src="stickers/nick-brenna.png"
-            alt="Nick and Brenna wedding artwork"
-          />
         </div>
       </aside>
 
@@ -420,34 +359,6 @@
               data-sticker-choice="diamond"
             >
               💎
-            </button>
-            <button
-              class="picker-sticker emoji-picker-sticker"
-              type="button"
-              data-sticker-choice="ring"
-            >
-              💍
-            </button>
-            <button
-              class="picker-sticker emoji-picker-sticker"
-              type="button"
-              data-sticker-choice="taco"
-            >
-              🌮
-            </button>
-            <button
-              class="picker-sticker emoji-picker-sticker"
-              type="button"
-              data-sticker-choice="married"
-            >
-              💒
-            </button>
-            <button
-              class="picker-sticker emoji-picker-sticker"
-              type="button"
-              data-sticker-choice="horsefart"
-            >
-              🐎💨
             </button>
             <button
               class="picker-sticker picker-image-sticker"
@@ -563,6 +474,6 @@
         </div>
       </section>
     </main>
-    <script src="app.js?v=20261005-1"></script>
+    <script src="app.js?v=20261005-2"></script>
   </body>
 </html>

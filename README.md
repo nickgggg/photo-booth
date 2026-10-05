@@ -71,6 +71,6 @@ For another machine, install `playwright@1.58.2` in an external tools directory 
 
 Camera access starts automatically when the browser allows it; denied access reveals a retry button. Photos do not request microphone permission. Video requests microphone permission when selected and can record silently if denied. Use an HTTPS deployment to test on an iPad; a cloud machine's localhost is not reachable from your phone.
 
-All guest controls and picker choices fit within the viewport on iPad in portrait and landscape. Selected stickers have move, resize/rotate and delete controls in the preview. Back to camera retains effects; Next guest resets stickers, filter, timer and watermark while preserving the screen-light setting and owner archive.
+The header is removed and the camera occupies the space above compact controls. All guest controls and picker choices fit within the viewport on iPad in portrait and landscape. Filters are unlabeled color tiles with accessible names. Selected stickers have move, resize/rotate and delete controls in the preview. Back to camera retains effects; Next guest resets stickers, filter, timer and watermark while preserving the screen-light setting and owner archive.
 
 See [REVIEW.md](REVIEW.md) for review findings and external integration limits.

@@ -107,7 +107,6 @@ let handleGesture = null;
 let archiveWarning = false;
 let uploadQueuePrepared = false;
 let wakeLock = null;
-let filterPreviewTimer = null;
 let cameraRotation = 0;
 let uploadSyncInFlight = false;
 let uploadSyncRequested = false;
@@ -199,9 +198,7 @@ async function startCamera() {
       els.camera.srcObject = stream;
       await els.camera.play();
       updateCameraLayout();
-      renderFilterPreviews();
-      clearInterval(filterPreviewTimer);
-      filterPreviewTimer = setInterval(renderFilterPreviews, 750);
+
       els.cameraWelcome.classList.add("hidden");
       stream.getVideoTracks()[0].addEventListener("ended", () => {
         if (recorder?.state === "recording") stopVideo();
@@ -232,15 +229,12 @@ async function startCamera() {
       cameraStarting = false;
       cameraStartPromise = null;
       setBusy(false);
-      renderFilterPreviews();
     }
   })();
   return cameraStartPromise;
 }
 
 function stopCameraStream() {
-  clearInterval(filterPreviewTimer);
-  filterPreviewTimer = null;
   stream?.getTracks().forEach((track) => track.stop());
   stream = null;
 }
@@ -295,40 +289,6 @@ function updateCameraLayout() {
     height: `${rect.height}px`,
   });
   updateStickerTools();
-}
-
-function renderFilterPreviews() {
-  if (!stream || !els.camera.videoWidth || document.hidden || busy) return;
-  document.querySelectorAll("[data-filter-choice]").forEach((button) => {
-    const canvas = button.querySelector("canvas");
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    const dimensions = cameraDimensions();
-    const scale = Math.max(
-      canvas.width / dimensions.width,
-      canvas.height / dimensions.height,
-    );
-    const filter = filterForCanvas(button.dataset.filterChoice);
-    ctx.save();
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (typeof ctx.filter === "string") ctx.filter = filter;
-    ctx.translate(canvas.width / 2, canvas.height / 2);
-    ctx.rotate((cameraRotation * Math.PI) / 180);
-    ctx.drawImage(
-      els.camera,
-      (-els.camera.videoWidth * scale) / 2,
-      (-els.camera.videoHeight * scale) / 2,
-      els.camera.videoWidth * scale,
-      els.camera.videoHeight * scale,
-    );
-    ctx.restore();
-    if (typeof ctx.filter !== "string")
-      applyCanvasFilter(
-        ctx,
-        canvas.width,
-        canvas.height,
-        button.dataset.filterChoice,
-      );
-  });
 }
 
 function drawCameraFrame(ctx, width, height) {
@@ -725,7 +685,6 @@ function rotateCamera(degrees) {
   if (busy || currentCapture) return;
   cameraRotation = normalizeDegrees(cameraRotation + degrees);
   updateCameraLayout();
-  renderFilterPreviews();
 }
 
 function addSticker(kind) {
@@ -1141,9 +1100,11 @@ function drawSticker(ctx, sticker, centerX, centerY, baseScale) {
   ctx.fillStyle = sticker.fill;
   ctx.strokeStyle = "#171310";
   ctx.lineWidth = 3 * scale;
-  rectPath(ctx, -width / 2, -height / 2, width, height);
-  ctx.fill();
-  ctx.stroke();
+  if (!isEmoji) {
+    rectPath(ctx, -width / 2, -height / 2, width, height);
+    ctx.fill();
+    ctx.stroke();
+  }
   ctx.fillStyle = "#171310";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
@@ -1186,10 +1147,6 @@ function stickerText(kind) {
   if (kind === "brickdup") return "BRICKDUP";
   if (kind === "congrats") return "CONGRATS";
   if (kind === "diamond") return "💎";
-  if (kind === "ring") return "💍";
-  if (kind === "taco") return "🌮";
-  if (kind === "married") return "💒";
-  if (kind === "horsefart") return "🐎💨";
   return "";
 }
 
@@ -1200,12 +1157,12 @@ function isImageSticker(kind) {
 function stickerFill(kind) {
   if (kind === "brickdup") return "#d8ecf0";
   if (kind === "congrats") return "#f2b6a7";
-  if (emojiSticker(kind)) return "#d8ecf0";
+  if (kind === "diamond") return "transparent";
   return "#f1c64b";
 }
 
 function emojiSticker(kind) {
-  return ["diamond", "ring", "taco", "married", "horsefart"].includes(kind);
+  return kind === "diamond";
 }
 
 function setSelected(selector, selectedButton) {

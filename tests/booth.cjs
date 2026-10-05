@@ -112,6 +112,20 @@ const check = (name, condition) => {
       await page.setViewportSize({ width, height });
       await open();
       check(`all controls fit ${width}x${height}`, await noClipping());
+      if (
+        (width === 1024 && height === 768) ||
+        (width === 768 && height === 1024)
+      ) {
+        check(
+          `camera area expanded ${width}x${height}`,
+          await page.evaluate(() => {
+            const rect = document
+              .querySelector("#stage")
+              .getBoundingClientRect();
+            return rect.width * rect.height > 560000;
+          }),
+        );
+      }
       await page.click("#openStickerPicker");
       check(
         `all sticker choices fit ${width}x${height}`,
@@ -142,26 +156,75 @@ const check = (name, condition) => {
       ),
     );
     check(
-      "camera thumbnails are rendered",
+      "filter tiles have no visible text and retain names",
       await page.evaluate(() =>
-        [...document.querySelectorAll(".filter-swatch")].every(
-          (canvas) =>
-            canvas.getContext("2d").getImageData(10, 10, 1, 1).data[3] === 255,
+        [...document.querySelectorAll("[data-filter-choice]")].every(
+          (button) =>
+            !button.textContent.trim() && button.getAttribute("aria-label"),
         ),
       ),
     );
     check(
-      "filter thumbnails show different effects",
+      "filter tiles have large touch targets",
+      await page.evaluate(() =>
+        [...document.querySelectorAll("[data-filter-choice]")].every(
+          (button) => {
+            const rect = button.getBoundingClientRect();
+            return rect.width >= 44 && rect.height >= 44;
+          },
+        ),
+      ),
+    );
+    check(
+      "branding header removed",
+      (await page.locator(".topbar").count()) === 0,
+    );
+    check(
+      "unwanted emoji choices removed",
+      (await page
+        .locator(
+          '[data-sticker-choice="ring"], [data-sticker-choice="taco"], [data-sticker-choice="married"], [data-sticker-choice="horsefart"]',
+        )
+        .count()) === 0,
+    );
+    await page.click("#openStickerPicker");
+    await page.click('[data-sticker-choice="diamond"]');
+    check(
+      "diamond preview has a transparent background",
       await page.evaluate(() => {
-        const a = document
-          .querySelector('[data-filter-choice="none"] canvas')
-          .toDataURL();
-        const b = document
-          .querySelector('[data-filter-choice="mono"] canvas')
-          .toDataURL();
-        return a !== b;
+        const style = getComputedStyle(
+          document.querySelector(".editable-sticker"),
+        );
+        return (
+          style.backgroundColor === "rgba(0, 0, 0, 0)" &&
+          style.borderTopColor === "rgba(0, 0, 0, 0)"
+        );
       }),
     );
+    check(
+      "diamond capture has no rectangle",
+      await page.evaluate(() => {
+        const canvas = document.createElement("canvas");
+        canvas.width = 200;
+        canvas.height = 200;
+        const ctx = canvas.getContext("2d");
+        drawSticker(
+          ctx,
+          {
+            kind: "diamond",
+            text: "💎",
+            fill: "transparent",
+            scale: 1,
+            rotation: 0,
+          },
+          100,
+          100,
+          1,
+        );
+        return ctx.getImageData(60, 55, 1, 1).data[3] === 0;
+      }),
+    );
+    await page.click("#removeSticker");
     await page.click('[data-filter-choice="mono"]');
     check(
       "filter selection has accessible state",
