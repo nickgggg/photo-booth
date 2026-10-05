@@ -1,225 +1,568 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="BRIXPIX">
-    <meta name="application-name" content="BRIXPIX">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <meta name="theme-color" content="#f8f3e8">
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="BRIXPIX" />
+    <meta name="application-name" content="BRIXPIX" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="theme-color" content="#f5f5f5" />
     <title>BRIXPIX</title>
-    <link rel="manifest" href="manifest.webmanifest">
-    <link rel="apple-touch-icon" href="icons/brixpix-apple-touch-icon.png">
-    <link rel="icon" href="icons/brixpix-icon.svg" type="image/svg+xml">
-    <link rel="stylesheet" href="styles.css?v=20260828-1">
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="icons/brixpix-apple-touch-icon.png" />
+    <link rel="icon" href="icons/brixpix-icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css?v=20261005-1" />
   </head>
   <body>
+    <svg
+      class="icon-definitions"
+      aria-hidden="true"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <symbol id="icon-refresh" viewBox="0 0 24 24">
+        <path d="M20 7v5h-5M19 12a7 7 0 1 1-2-5l3 3" />
+      </symbol>
+      <symbol id="icon-left" viewBox="0 0 24 24">
+        <path d="M4 9h10a6 6 0 0 1 0 12M8 5 4 9l4 4" />
+      </symbol>
+      <symbol id="icon-right" viewBox="0 0 24 24">
+        <path d="M20 9H10a6 6 0 0 0 0 12M16 5l4 4-4 4" />
+      </symbol>
+      <symbol id="icon-share" viewBox="0 0 24 24">
+        <path d="M12 16V3m-4 4 4-4 4 4M5 12H3v9h18v-9h-2" />
+      </symbol>
+      <symbol id="icon-light" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="4" />
+        <path
+          d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"
+        />
+      </symbol>
+    </svg>
+
     <main class="booth" data-ring="off" data-filter="none" data-logo="on">
-      <section id="stage" class="stage" aria-label="Camera preview and capture result">
+      <header class="topbar">
+        <div class="brand"><span class="brand-name">BRIXPIX</span></div>
+        <div class="event-title">
+          Nick &amp; Brenna <span>10 · 10 · 26</span>
+        </div>
+        <button id="refreshApp" class="quiet-button" type="button">
+          <svg class="icon" aria-hidden="true">
+            <use href="#icon-refresh"></use>
+          </svg>
+          Refresh
+        </button>
+      </header>
+
+      <section
+        id="stage"
+        class="stage"
+        aria-label="Camera preview and capture result"
+      >
         <video id="camera" class="camera" autoplay playsinline muted></video>
         <canvas id="snapshot" class="hidden"></canvas>
         <div id="liveOverlays" class="live-overlays">
           <div class="booth-logo">brick2026</div>
-          <div id="stickersLayer" class="stickers-layer" aria-label="Stickers"></div>
+          <div
+            id="stickersLayer"
+            class="stickers-layer"
+            aria-label="Stickers"
+          ></div>
         </div>
-        <div id="result" class="result hidden" aria-live="polite"></div>
-        <div id="countdown" class="countdown hidden" aria-live="assertive"></div>
-        <button id="ringLightButton" class="stage-light" type="button" aria-label="Toggle ring light" title="Ring light">⚡</button>
-        <div class="stage-capture">
-          <button id="photoBooth" class="capture-mode photo-mode" type="button" disabled>
-            <span class="capture-mode-icon" aria-hidden="true">📷</span>
-            <span>Photo Booth</span>
+        <div id="result" class="result hidden"></div>
+        <div id="cameraWelcome" class="camera-welcome">
+          <img class="welcome-art" src="stickers/brick-bn.png" alt="" />
+          <p id="cameraMessage">Starting camera…</p>
+          <button id="startCamera" class="primary hidden" type="button">
+            Enable camera
           </button>
-          <button id="confessionalMode" class="capture-mode confessional-mode" type="button" disabled>
-            <span class="capture-mode-icon" aria-hidden="true">🎙️</span>
-            <span>Confessional</span>
+        </div>
+        <div
+          id="countdown"
+          class="countdown hidden"
+          role="status"
+          aria-live="assertive"
+        ></div>
+        <div
+          id="recordingIndicator"
+          class="recording-indicator hidden"
+          role="status"
+        >
+          <span></span><b id="recordingTime">00:00 / 00:15</b>
+        </div>
+        <button
+          id="ringLightButton"
+          class="stage-light"
+          type="button"
+          aria-label="Toggle screen light"
+          aria-pressed="false"
+        >
+          <svg class="icon" aria-hidden="true">
+            <use href="#icon-light"></use>
+          </svg>
+          Light
+        </button>
+        <div
+          id="stickerTools"
+          class="sticker-tools hidden"
+          role="group"
+          aria-label="Selected sticker"
+        >
+          <button
+            id="removeSticker"
+            type="button"
+            aria-label="Delete sticker"
+            title="Delete sticker"
+          >
+            ×
+          </button>
+          <button
+            id="rotateSticker"
+            type="button"
+            aria-label="Rotate sticker"
+            title="Rotate sticker"
+          >
+            ↻
+          </button>
+          <button
+            id="resizeSticker"
+            type="button"
+            aria-label="Drag to resize and rotate sticker; arrow keys resize"
+            title="Drag to resize and rotate"
+          >
+            ⤢
           </button>
         </div>
       </section>
 
-      <section class="controls" aria-label="Photo booth controls">
-        <header class="brand-lockup" aria-label="BRIXPIX, Brick 2026 photo booth">
-          <span class="brand-star" aria-hidden="true">✦</span>
-          <div>
-            <span class="brand-name">BRIXPIX</span>
-            <strong>BRICK 2026 PHOTO BOOTH</strong>
-          </div>
-          <span class="brand-star" aria-hidden="true">✦</span>
-        </header>
-
-        <div class="controls-scroll">
-          <div class="session-row">
-            <button id="startCamera" class="primary camera-power" type="button">Turn On Camera</button>
-            <button id="refreshApp" class="icon-button" type="button" aria-label="Refresh app" title="Refresh app">↻</button>
-          </div>
-
-          <div class="quick-settings">
-            <div class="control-section timer-section">
-              <label class="field" for="timer">
-                <span>Timer</span>
-                <select id="timer">
-                  <option value="0">Off</option>
-                  <option value="3" selected>3 sec</option>
-                  <option value="5">5 sec</option>
-                  <option value="10">10 sec</option>
-                </select>
-              </label>
-            </div>
-
-            <div class="control-section rotate-section">
-              <div class="mini-label">Camera</div>
-              <div class="rotate-tools">
-                <button id="rotateCameraLeft" class="icon-button" type="button" aria-label="Rotate camera left" title="Rotate camera left">↶</button>
-                <button id="rotateCameraRight" class="icon-button" type="button" aria-label="Rotate camera right" title="Rotate camera right">↷</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="control-section overlay-panel filter-panel">
-            <div class="section-heading">
-              <div class="mini-label">Filter</div>
-              <span>Pick a mood</span>
-            </div>
-            <div class="chip-row filters" role="group" aria-label="Filter">
-              <button class="chip selected" type="button" data-filter-choice="none">Clean</button>
-              <button class="chip" type="button" data-filter-choice="warm">Golden</button>
-              <button class="chip" type="button" data-filter-choice="flash">Flash</button>
-              <button class="chip" type="button" data-filter-choice="mono">B&amp;W</button>
-              <button class="chip" type="button" data-filter-choice="acid">Acid</button>
-              <button class="chip" type="button" data-filter-choice="disco">Disco</button>
-              <button class="chip" type="button" data-filter-choice="dream">Dream</button>
-              <button class="chip" type="button" data-filter-choice="vhs">VHS</button>
-            </div>
-          </div>
-
-          <div class="control-section overlay-panel sticker-panel">
-            <div class="section-heading">
-              <div class="mini-label">Stickers</div>
-              <span>Make it yours</span>
-            </div>
-            <button id="openStickerPicker" class="sticker-launcher" type="button" aria-expanded="false" aria-controls="stickerPicker">
-              <span aria-hidden="true">✦ 💎 🧱</span>
-              <strong>Add sticker</strong>
-              <span id="stickerChoiceCount" class="sticker-launcher-count">Stickers</span>
-            </button>
-          </div>
-
-          <div class="control-section finishing-section">
-            <div class="sticker-actions">
-              <div class="mini-label">Selected Sticker</div>
-              <div class="sticker-tools">
-                <button id="rotateSticker" class="tool-button" type="button">↻ Rotate</button>
-                <button id="removeSticker" class="tool-button danger" type="button">× Remove</button>
-              </div>
-            </div>
-
-            <div class="logo-section">
-              <label class="toggle compact">
-                <input id="logoOverlay" type="checkbox" checked>
-                <span>brick2026 watermark</span>
-              </label>
-            </div>
-          </div>
-
-          <div id="adminPanel" class="admin-panel hidden">
-            <button id="exportArchive" type="button">Export Saved Photos</button>
-            <span id="archiveCount">0 saved</span>
-            <small>Photos save locally and sync to the built-in Drive folder automatically.</small>
-          </div>
-
-          <p id="status" class="status">Turn on the camera to begin.</p>
-
-          <div class="event-mark" aria-hidden="true">
-            <span>B + N</span>
-            <strong>10 · 10 · 26</strong>
-          </div>
+      <aside class="controls" aria-label="Photo booth controls">
+        <div class="controls-intro">
+          <h1>brick2026</h1>
+          <p>B + N · October 10, 2026</p>
         </div>
-
-        <footer class="controls-footer">
-          <button id="shareCapture" type="button" disabled>Share Latest Capture</button>
-        </footer>
-      </section>
-
-      <section id="stickerPicker" class="sticker-picker hidden" role="dialog" aria-modal="true" aria-labelledby="stickerPickerTitle">
-        <div class="sticker-picker-sheet">
-          <header class="sticker-picker-header">
-            <div>
-              <p>BRIXPIX STICKER BAR</p>
-              <h2 id="stickerPickerTitle">Pick a sticker</h2>
-            </div>
-            <button id="closeStickerPicker" class="picker-close" type="button" aria-label="Close sticker picker">×</button>
-          </header>
-
-          <div class="sticker-picker-grid" role="group" aria-label="Choose a sticker">
-            <button class="picker-sticker word-sticker pink" type="button" data-sticker-choice="norbit">NORBITLUVR</button>
-            <button class="picker-sticker word-sticker cyan" type="button" data-sticker-choice="brickdup">BRICKDUP</button>
-            <button class="picker-sticker word-sticker yellow" type="button" data-sticker-choice="congrats">CONGRATS</button>
-            <button class="picker-sticker emoji-picker-sticker" type="button" data-sticker-choice="diamond">💎</button>
-            <button class="picker-sticker emoji-picker-sticker" type="button" data-sticker-choice="ring">💍</button>
-            <button class="picker-sticker emoji-picker-sticker" type="button" data-sticker-choice="taco">🌮</button>
-            <button class="picker-sticker emoji-picker-sticker" type="button" data-sticker-choice="married">💒</button>
-            <button class="picker-sticker emoji-picker-sticker" type="button" data-sticker-choice="horsefart">🐎💨</button>
-            <button class="picker-sticker picker-image-sticker" type="button" data-sticker-choice="brickart" aria-label="Flaming brick sticker">
-              <img src="stickers/brick-bn.png" alt="">
+        <div class="filter-panel">
+          <span class="control-label" id="filterLabel">Filter</span>
+          <div class="filters" role="group" aria-labelledby="filterLabel">
+            <button
+              class="filter selected"
+              type="button"
+              data-filter-choice="none"
+              aria-pressed="true"
+            >
+              <canvas
+                class="filter-swatch clean"
+                width="96"
+                height="96"
+                aria-hidden="true"
+              ></canvas
+              >Clean
             </button>
-            <button class="picker-sticker picker-image-sticker picker-image-wide" type="button" data-sticker-choice="nickbrenna" aria-label="Nick and Brenna sticker">
-              <img src="stickers/nick-brenna.png" alt="">
+            <button
+              class="filter"
+              type="button"
+              data-filter-choice="warm"
+              aria-pressed="false"
+            >
+              <canvas
+                class="filter-swatch warm"
+                width="96"
+                height="96"
+                aria-hidden="true"
+              ></canvas
+              >Golden
             </button>
-            <button class="picker-sticker picker-image-sticker picker-image-wide" type="button" data-sticker-choice="huntingtonbeach" aria-label="Huntington Beach sticker">
-              <img src="stickers/huntington-beach.png" alt="">
+            <button
+              class="filter"
+              type="button"
+              data-filter-choice="flash"
+              aria-pressed="false"
+            >
+              <canvas
+                class="filter-swatch flash"
+                width="96"
+                height="96"
+                aria-hidden="true"
+              ></canvas
+              >Flash
             </button>
-            <button class="picker-sticker picker-image-sticker" type="button" data-sticker-choice="norbitcutout" aria-label="Norbit reaction sticker">
-              <img src="stickers/norbit-cutout.png" alt="">
+            <button
+              class="filter"
+              type="button"
+              data-filter-choice="mono"
+              aria-pressed="false"
+            >
+              <canvas
+                class="filter-swatch mono"
+                width="96"
+                height="96"
+                aria-hidden="true"
+              ></canvas
+              >B&amp;W
             </button>
-            <button class="picker-sticker picker-image-sticker" type="button" data-sticker-choice="cat" aria-label="Cat sticker">
-              <img src="stickers/cat.png" alt="">
+            <button
+              class="filter"
+              type="button"
+              data-filter-choice="acid"
+              aria-pressed="false"
+            >
+              <canvas
+                class="filter-swatch acid"
+                width="96"
+                height="96"
+                aria-hidden="true"
+              ></canvas
+              >Acid
+            </button>
+            <button
+              class="filter"
+              type="button"
+              data-filter-choice="disco"
+              aria-pressed="false"
+            >
+              <canvas
+                class="filter-swatch disco"
+                width="96"
+                height="96"
+                aria-hidden="true"
+              ></canvas
+              >Disco
+            </button>
+            <button
+              class="filter"
+              type="button"
+              data-filter-choice="dream"
+              aria-pressed="false"
+            >
+              <canvas
+                class="filter-swatch dream"
+                width="96"
+                height="96"
+                aria-hidden="true"
+              ></canvas
+              >Dream
+            </button>
+            <button
+              class="filter"
+              type="button"
+              data-filter-choice="vhs"
+              aria-pressed="false"
+            >
+              <canvas
+                class="filter-swatch vhs"
+                width="96"
+                height="96"
+                aria-hidden="true"
+              ></canvas
+              >VHS
             </button>
           </div>
         </div>
-      </section>
-
-      <section id="confessionalPicker" class="confessional-picker hidden" role="dialog" aria-modal="true" aria-labelledby="confessionalPickerTitle">
-        <div class="confessional-picker-sheet">
-          <header class="confessional-picker-header">
-            <div>
-              <p>BRIXPIX CONFESSIONAL</p>
-              <h2 id="confessionalPickerTitle">What do you want to say?</h2>
+        <button
+          id="openStickerPicker"
+          class="sticker-launcher"
+          type="button"
+          aria-expanded="false"
+          aria-controls="stickerPicker"
+        >
+          <img
+            class="sticker-launcher-art"
+            src="stickers/brick-bn.png"
+            alt=""
+          /><span
+            >Add stickers<small id="stickerChoiceCount">13 choices</small></span
+          ><span aria-hidden="true">＋</span>
+        </button>
+        <div class="settings-row">
+          <label class="timer-field" for="timer"
+            ><span class="control-label">Timer</span
+            ><select id="timer">
+              <option value="0">Off</option>
+              <option value="3" selected>3 sec</option>
+              <option value="5">5 sec</option>
+              <option value="10">10 sec</option>
+            </select></label
+          >
+          <div class="rotation-field">
+            <span class="control-label">Rotate view</span>
+            <div class="rotate-tools">
+              <button
+                id="rotateCameraLeft"
+                type="button"
+                aria-label="Rotate camera left 90 degrees"
+              >
+                <svg class="icon" aria-hidden="true">
+                  <use href="#icon-left"></use>
+                </svg></button
+              ><button
+                id="rotateCameraRight"
+                type="button"
+                aria-label="Rotate camera right 90 degrees"
+              >
+                <svg class="icon" aria-hidden="true">
+                  <use href="#icon-right"></use>
+                </svg>
+              </button>
             </div>
-            <button id="closeConfessionalPicker" class="picker-close" type="button" aria-label="Close confessional prompts">×</button>
+          </div>
+        </div>
+        <label class="watermark-toggle"
+          ><span>brick2026 watermark</span
+          ><input id="logoOverlay" type="checkbox" checked /><span
+            class="switch"
+            aria-hidden="true"
+          ></span
+        ></label>
+        <div id="adminPanel" class="admin-panel hidden">
+          <button id="exportArchive" type="button">Export archive</button
+          ><span id="archiveCount">0 saved</span>
+        </div>
+        <div class="controls-note">
+          <img
+            src="stickers/nick-brenna.png"
+            alt="Nick and Brenna wedding artwork"
+          />
+        </div>
+      </aside>
+
+      <footer class="capture-dock">
+        <div class="session-status">
+          <span class="status-dot" aria-hidden="true"></span>
+          <p id="status" role="status" aria-live="polite">Starting camera…</p>
+        </div>
+        <div class="capture-actions">
+          <button id="photoBooth" class="shutter" type="button" disabled>
+            <span class="shutter-icon" aria-hidden="true"></span
+            ><span>Take photo</span></button
+          ><button
+            id="confessionalMode"
+            class="video-button"
+            type="button"
+            disabled
+          >
+            <span class="video-icon" aria-hidden="true"></span
+            ><span>Record video</span>
+          </button>
+        </div>
+        <div class="result-actions">
+          <button id="retakeCapture" class="quiet-button hidden" type="button">
+            Back to camera</button
+          ><button
+            id="shareCapture"
+            class="share-button"
+            type="button"
+            disabled
+          >
+            <svg class="icon" aria-hidden="true">
+              <use href="#icon-share"></use>
+            </svg>
+            Share</button
+          ><button id="nextGuest" class="quiet-button hidden" type="button">
+            Next guest
+          </button>
+        </div>
+      </footer>
+
+      <section
+        id="stickerPicker"
+        class="picker hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="stickerPickerTitle"
+      >
+        <div class="picker-sheet">
+          <header class="picker-header">
+            <div>
+              <h2 id="stickerPickerTitle">Stickers</h2>
+              <p>Drag to move. Pinch to resize or rotate.</p>
+            </div>
+            <button
+              id="closeStickerPicker"
+              class="picker-close"
+              type="button"
+              aria-label="Close sticker picker"
+            >
+              ×
+            </button>
           </header>
-          <div class="confessional-prompt-grid" role="group" aria-label="Choose a confessional prompt">
-            <button class="confessional-prompt memory" type="button" data-confessional-prompt="Funny or fond memory of Nick and/or Brenna">
-              <span>01</span>
+          <div
+            class="sticker-picker-grid"
+            role="group"
+            aria-label="Choose a sticker"
+          >
+            <button
+              class="picker-sticker word-sticker pink"
+              type="button"
+              data-sticker-choice="norbit"
+            >
+              NORBITLUVR
+            </button>
+            <button
+              class="picker-sticker word-sticker cyan"
+              type="button"
+              data-sticker-choice="brickdup"
+            >
+              BRICKDUP
+            </button>
+            <button
+              class="picker-sticker word-sticker yellow"
+              type="button"
+              data-sticker-choice="congrats"
+            >
+              CONGRATS
+            </button>
+            <button
+              class="picker-sticker emoji-picker-sticker"
+              type="button"
+              data-sticker-choice="diamond"
+            >
+              💎
+            </button>
+            <button
+              class="picker-sticker emoji-picker-sticker"
+              type="button"
+              data-sticker-choice="ring"
+            >
+              💍
+            </button>
+            <button
+              class="picker-sticker emoji-picker-sticker"
+              type="button"
+              data-sticker-choice="taco"
+            >
+              🌮
+            </button>
+            <button
+              class="picker-sticker emoji-picker-sticker"
+              type="button"
+              data-sticker-choice="married"
+            >
+              💒
+            </button>
+            <button
+              class="picker-sticker emoji-picker-sticker"
+              type="button"
+              data-sticker-choice="horsefart"
+            >
+              🐎💨
+            </button>
+            <button
+              class="picker-sticker picker-image-sticker"
+              type="button"
+              data-sticker-choice="brickart"
+              aria-label="Flaming brick sticker"
+            >
+              <img src="stickers/brick-bn.png" alt="" />
+            </button>
+            <button
+              class="picker-sticker picker-image-sticker picker-image-wide"
+              type="button"
+              data-sticker-choice="nickbrenna"
+              aria-label="Nick and Brenna sticker"
+            >
+              <img src="stickers/nick-brenna.png" alt="" />
+            </button>
+            <button
+              class="picker-sticker picker-image-sticker picker-image-wide"
+              type="button"
+              data-sticker-choice="huntingtonbeach"
+              aria-label="Huntington Beach sticker"
+            >
+              <img src="stickers/huntington-beach.png" alt="" />
+            </button>
+            <button
+              class="picker-sticker picker-image-sticker"
+              type="button"
+              data-sticker-choice="norbitcutout"
+              aria-label="Norbit reaction sticker"
+            >
+              <img src="stickers/norbit-cutout.png" alt="" />
+            </button>
+            <button
+              class="picker-sticker picker-image-sticker"
+              type="button"
+              data-sticker-choice="cat"
+              aria-label="Cat sticker"
+            >
+              <img src="stickers/cat.png" alt="" />
+            </button>
+          </div>
+        </div>
+      </section>
+      <section
+        id="confessionalPicker"
+        class="picker hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confessionalPickerTitle"
+      >
+        <div class="picker-sheet video-sheet">
+          <header class="picker-header">
+            <div>
+              <h2 id="confessionalPickerTitle">Leave a video</h2>
+              <p>Choose a prompt. Up to 15 seconds.</p>
+            </div>
+            <button
+              id="closeConfessionalPicker"
+              class="picker-close"
+              type="button"
+              aria-label="Close video prompts"
+            >
+              ×
+            </button>
+          </header>
+          <div
+            class="confessional-prompt-grid"
+            role="group"
+            aria-label="Choose a confessional prompt"
+          >
+            <button
+              class="confessional-prompt memory"
+              type="button"
+              data-confessional-prompt="Funny or fond memory of Nick and/or Brenna"
+            >
               <strong>Funny or fond memory</strong>
               <small>of Nick and/or Brenna</small>
             </button>
-            <button class="confessional-prompt wishes" type="button" data-confessional-prompt="Best wishes / sendoff">
-              <span>02</span>
+            <button
+              class="confessional-prompt wishes"
+              type="button"
+              data-confessional-prompt="Best wishes / sendoff"
+            >
               <strong>Best wishes</strong>
               <small>or a sendoff for the newlyweds</small>
             </button>
-            <button class="confessional-prompt freestyle" type="button" data-confessional-prompt="Freestyle">
-              <span>03</span>
+            <button
+              class="confessional-prompt freestyle"
+              type="button"
+              data-confessional-prompt="Freestyle"
+            >
               <strong>Freestyle</strong>
-              <small>keep it on brand</small>
+              <small>Anything you want to share</small>
             </button>
-            <button class="confessional-prompt genuine" type="button" data-confessional-prompt="A genuine message">
-              <span>04</span>
+            <button
+              class="confessional-prompt genuine"
+              type="button"
+              data-confessional-prompt="A genuine message"
+            >
               <strong>Genuine message</strong>
-              <small>say the sweet thing</small>
+              <small>A message for Nick &amp; Brenna</small>
             </button>
-            <button class="confessional-prompt roast" type="button" data-confessional-prompt="Roast">
-              <span>05</span>
+            <button
+              class="confessional-prompt roast"
+              type="button"
+              data-confessional-prompt="Roast"
+            >
               <strong>Roast</strong>
-              <small>with love, obviously</small>
+              <small>Your best material</small>
             </button>
           </div>
         </div>
       </section>
     </main>
-
-    <script src="app.js?v=20260828-6"></script>
+    <script src="app.js?v=20261005-1"></script>
   </body>
 </html>

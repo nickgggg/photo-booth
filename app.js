@@ -2,6 +2,16 @@
 
 const els = {
   booth: document.querySelector(".booth"),
+  controls: document.querySelector(".controls"),
+  liveOverlays: document.getElementById("liveOverlays"),
+  cameraWelcome: document.getElementById("cameraWelcome"),
+  cameraMessage: document.getElementById("cameraMessage"),
+  stickerTools: document.getElementById("stickerTools"),
+  resizeSticker: document.getElementById("resizeSticker"),
+  retakeCapture: document.getElementById("retakeCapture"),
+  nextGuest: document.getElementById("nextGuest"),
+  recordingIndicator: document.getElementById("recordingIndicator"),
+  recordingTime: document.getElementById("recordingTime"),
   stage: document.getElementById("stage"),
   camera: document.getElementById("camera"),
   snapshot: document.getElementById("snapshot"),
@@ -29,13 +39,14 @@ const els = {
   adminPanel: document.getElementById("adminPanel"),
   exportArchive: document.getElementById("exportArchive"),
   archiveCount: document.getElementById("archiveCount"),
-  status: document.getElementById("status")
+  status: document.getElementById("status"),
 };
 
 const DB_NAME = "brixpix-archive";
 const DB_VERSION = 1;
 const STORE_NAME = "photos";
-const DEFAULT_UPLOAD_ENDPOINT = "https://script.google.com/macros/s/AKfycby2mTliV2bwMCL7y_N4RgBidcAF9aNHouUjzp2dTZ8u1yzjnaqqZHEfkn2Xk67BSgbc/exec";
+const DEFAULT_UPLOAD_ENDPOINT =
+  "https://script.google.com/macros/s/AKfycby2mTliV2bwMCL7y_N4RgBidcAF9aNHouUjzp2dTZ8u1yzjnaqqZHEfkn2Xk67BSgbc/exec";
 const UPLOAD_VERIFICATION_KEY = "brixpixVerifiedUploadsV1";
 const UPLOAD_RETRY_MS = 30000;
 const VIDEO_MAX_MS = 15000;
@@ -44,11 +55,23 @@ const AUDIO_BITS_PER_SECOND = 96000;
 const VIDEO_FRAME_RATE = 15;
 const VIDEO_MAX_WIDTH = 720;
 const IMAGE_STICKERS = {
-  brickart: { src: "stickers/brick-bn.png", width: 310, aspect: 467 / 373 },
-  nickbrenna: { src: "stickers/nick-brenna.png", width: 310, aspect: 467 / 373 },
-  huntingtonbeach: { src: "stickers/huntington-beach.png", width: 340, aspect: 1500 / 1300 },
-  norbitcutout: { src: "stickers/norbit-cutout.png", width: 285, aspect: 1206 / 1305 },
-  cat: { src: "stickers/cat.png", width: 250, aspect: 1903 / 2095 }
+  brickart: { src: "stickers/brick-bn.png", width: 190, aspect: 467 / 373 },
+  nickbrenna: {
+    src: "stickers/nick-brenna.png",
+    width: 190,
+    aspect: 467 / 373,
+  },
+  huntingtonbeach: {
+    src: "stickers/huntington-beach.png",
+    width: 210,
+    aspect: 1500 / 1300,
+  },
+  norbitcutout: {
+    src: "stickers/norbit-cutout.png",
+    width: 175,
+    aspect: 1206 / 1305,
+  },
+  cat: { src: "stickers/cat.png", width: 160, aspect: 1903 / 2095 },
 };
 const isAdmin = (() => {
   const params = new URLSearchParams(location.search);
@@ -76,7 +99,15 @@ let stickers = [];
 let selectedStickerId = null;
 let nextStickerId = 1;
 let dbPromise = null;
-let orientationRestartTimer = null;
+let cameraStarting = false;
+let cameraStartPromise = null;
+let microphoneStream = null;
+let recordingClock = null;
+let handleGesture = null;
+let archiveWarning = false;
+let uploadQueuePrepared = false;
+let wakeLock = null;
+let filterPreviewTimer = null;
 let cameraRotation = 0;
 let uploadSyncInFlight = false;
 let uploadSyncRequested = false;
@@ -102,12 +133,32 @@ function setStatus(message) {
 
 function setBusy(nextBusy) {
   busy = nextBusy;
-  const hasCamera = Boolean(stream);
+  const hasCamera = Boolean(
+    stream &&
+      stream.getVideoTracks().some((track) => track.readyState === "live"),
+  );
+  const isRecording = recorder && recorder.state === "recording";
   const hasCapture = Boolean(currentCapture);
-  els.photoBooth.disabled = busy;
-  els.confessionalMode.disabled = (busy && !(recorder && recorder.state === "recording")) || !window.MediaRecorder;
+  els.booth.classList.toggle("is-busy", busy);
+  els.booth.classList.toggle("is-review", hasCapture);
+  els.photoBooth.disabled = busy || !hasCamera;
+  els.confessionalMode.disabled =
+    (busy && !isRecording) || !hasCamera || !window.MediaRecorder;
   els.shareCapture.disabled = busy || !hasCapture;
-  els.startCamera.disabled = busy || hasCamera;
+  els.startCamera.disabled = cameraStarting;
+  els.refreshApp.disabled = busy;
+  els.retakeCapture.classList.toggle("hidden", !hasCapture);
+  els.nextGuest.classList.toggle("hidden", !hasCapture);
+  els.retakeCapture.disabled = busy;
+  els.nextGuest.disabled = busy;
+  els.photoBooth.querySelector("span:last-child").textContent = hasCapture
+    ? "Take another"
+    : "Take photo";
+  els.controls
+    .querySelectorAll("button, select, input")
+    .forEach((control) => (control.disabled = busy || hasCapture));
+  els.ringLightButton.disabled = busy && !isRecording;
+  updateStickerTools();
 }
 
 function clearCapture() {
@@ -116,62 +167,183 @@ function clearCapture() {
   els.stage.classList.remove("has-result");
   els.result.replaceChildren();
   els.result.classList.add("hidden");
+  archiveWarning = false;
   setBusy(false);
 }
 
 async function startCamera() {
-  clearCapture();
+  if (cameraStartPromise) return cameraStartPromise;
+  if (
+    stream &&
+    stream.getVideoTracks().some((track) => track.readyState === "live")
+  )
+    return;
+  cameraStarting = true;
   setBusy(true);
-
-  try {
-    stopCameraStream();
-    els.camera.srcObject = null;
-    await new Promise((resolve) => setTimeout(resolve, 120));
-
-    stream = await navigator.mediaDevices.getUserMedia(getMediaConstraints());
-
-    els.camera.srcObject = stream;
-    await els.camera.play();
-    els.startCamera.textContent = "Camera On";
-    els.startCamera.classList.add("is-on");
-    els.startCamera.disabled = true;
-    setStatus(window.MediaRecorder ? "Ready." : "Ready for photos. Video is not supported here.");
-  } catch (error) {
-    setStatus("Camera blocked. Use HTTPS and allow camera access.");
-  } finally {
-    setBusy(false);
-    if (stream) els.startCamera.disabled = true;
-  }
-}
-
-function getMediaConstraints() {
-  const landscape = window.innerWidth > window.innerHeight;
-  return {
-    video: {
-      facingMode: "user",
-      width: { ideal: landscape ? 1920 : 1080 },
-      height: { ideal: landscape ? 1080 : 1920 }
-    },
-    audio: true
-  };
+  els.cameraWelcome.classList.remove("hidden");
+  els.startCamera.classList.add("hidden");
+  els.cameraMessage.textContent = "Starting camera…";
+  cameraStartPromise = (async () => {
+    try {
+      if (!navigator.mediaDevices?.getUserMedia)
+        throw new Error("InsecureContext");
+      const landscape = innerWidth > innerHeight;
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "user",
+          width: { ideal: landscape ? 1920 : 1080 },
+          height: { ideal: landscape ? 1080 : 1920 },
+        },
+        audio: false,
+      });
+      els.camera.srcObject = stream;
+      await els.camera.play();
+      updateCameraLayout();
+      renderFilterPreviews();
+      clearInterval(filterPreviewTimer);
+      filterPreviewTimer = setInterval(renderFilterPreviews, 750);
+      els.cameraWelcome.classList.add("hidden");
+      stream.getVideoTracks()[0].addEventListener("ended", () => {
+        if (recorder?.state === "recording") stopVideo();
+        stopCameraStream();
+        if (!recorder) setBusy(false);
+        els.cameraWelcome.classList.remove("hidden");
+        els.startCamera.classList.remove("hidden");
+        els.cameraMessage.textContent =
+          "Camera disconnected. Tap to reconnect.";
+        setStatus("Camera disconnected.");
+      });
+      setStatus("Ready.");
+      requestWakeLock();
+    } catch (error) {
+      stopCameraStream();
+      const message = !window.isSecureContext
+        ? "Camera access needs HTTPS. Open the secure site."
+        : error.name === "NotAllowedError"
+          ? "Allow camera access in your browser, then try again."
+          : error.name === "NotFoundError"
+            ? "No camera found. Connect a camera and try again."
+            : "Camera unavailable. Close other camera apps, then try again.";
+      els.cameraMessage.textContent = message;
+      els.startCamera.textContent = "Enable camera";
+      els.startCamera.classList.remove("hidden");
+      setStatus(message);
+    } finally {
+      cameraStarting = false;
+      cameraStartPromise = null;
+      setBusy(false);
+      renderFilterPreviews();
+    }
+  })();
+  return cameraStartPromise;
 }
 
 function stopCameraStream() {
-  if (!stream) return;
-  stream.getTracks().forEach((track) => track.stop());
+  clearInterval(filterPreviewTimer);
+  filterPreviewTimer = null;
+  stream?.getTracks().forEach((track) => track.stop());
   stream = null;
 }
 
-function restartCameraForOrientation() {
-  if (!stream || busy) return;
-  clearTimeout(orientationRestartTimer);
-  orientationRestartTimer = setTimeout(() => {
-    startCamera().then(() => {
-      setStatus("Camera adjusted.");
-    }).catch(() => {
-      setStatus("Use Refresh if camera looks wrong.");
-    });
-  }, 350);
+async function requestWakeLock() {
+  try {
+    if (
+      document.visibilityState === "visible" &&
+      navigator.wakeLock &&
+      !wakeLock
+    ) {
+      wakeLock = await navigator.wakeLock.request("screen");
+      wakeLock.addEventListener("release", () => {
+        wakeLock = null;
+      });
+    }
+  } catch (_) {
+    /* Guided Access remains the device fallback. */
+  }
+}
+
+function cameraDimensions() {
+  const rotated = Math.abs(cameraRotation) === 90;
+  const width = els.camera.videoWidth || 1280;
+  const height = els.camera.videoHeight || 720;
+  return rotated ? { width: height, height: width } : { width, height };
+}
+
+function updateCameraLayout() {
+  const stage = els.stage.getBoundingClientRect();
+  const dimensions = cameraDimensions();
+  const rect = mediaDisplayRect(
+    stage.width,
+    stage.height,
+    dimensions.width,
+    dimensions.height,
+  );
+  const factor = rect.width / dimensions.width;
+  const width = (els.camera.videoWidth || 1280) * factor;
+  const height = (els.camera.videoHeight || 720) * factor;
+  Object.assign(els.camera.style, {
+    width: `${width}px`,
+    height: `${height}px`,
+    left: `${(stage.width - width) / 2}px`,
+    top: `${(stage.height - height) / 2}px`,
+    transform: `rotate(${cameraRotation}deg)`,
+  });
+  Object.assign(els.liveOverlays.style, {
+    left: `${rect.x}px`,
+    top: `${rect.y}px`,
+    width: `${rect.width}px`,
+    height: `${rect.height}px`,
+  });
+  updateStickerTools();
+}
+
+function renderFilterPreviews() {
+  if (!stream || !els.camera.videoWidth || document.hidden || busy) return;
+  document.querySelectorAll("[data-filter-choice]").forEach((button) => {
+    const canvas = button.querySelector("canvas");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    const dimensions = cameraDimensions();
+    const scale = Math.max(
+      canvas.width / dimensions.width,
+      canvas.height / dimensions.height,
+    );
+    const filter = filterForCanvas(button.dataset.filterChoice);
+    ctx.save();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (typeof ctx.filter === "string") ctx.filter = filter;
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate((cameraRotation * Math.PI) / 180);
+    ctx.drawImage(
+      els.camera,
+      (-els.camera.videoWidth * scale) / 2,
+      (-els.camera.videoHeight * scale) / 2,
+      els.camera.videoWidth * scale,
+      els.camera.videoHeight * scale,
+    );
+    ctx.restore();
+    if (typeof ctx.filter !== "string")
+      applyCanvasFilter(
+        ctx,
+        canvas.width,
+        canvas.height,
+        button.dataset.filterChoice,
+      );
+  });
+}
+
+function drawCameraFrame(ctx, width, height) {
+  ctx.save();
+  ctx.translate(width / 2, height / 2);
+  ctx.rotate((cameraRotation * Math.PI) / 180);
+  const rotated = Math.abs(cameraRotation) === 90;
+  ctx.drawImage(
+    els.camera,
+    -(rotated ? height : width) / 2,
+    -(rotated ? width : height) / 2,
+    rotated ? height : width,
+    rotated ? width : height,
+  );
+  ctx.restore();
 }
 
 async function runTimer() {
@@ -189,20 +361,32 @@ async function runTimer() {
 function timestampFileName(extension, prefix = "BRIXPIX") {
   const now = new Date();
   const pad = (value, length = 2) => String(value).padStart(length, "0");
-  const date = [now.getFullYear(), pad(now.getMonth() + 1), pad(now.getDate())].join("-");
-  const time = [pad(now.getHours()), pad(now.getMinutes()), pad(now.getSeconds())].join("-");
+  const date = [
+    now.getFullYear(),
+    pad(now.getMonth() + 1),
+    pad(now.getDate()),
+  ].join("-");
+  const time = [
+    pad(now.getHours()),
+    pad(now.getMinutes()),
+    pad(now.getSeconds()),
+  ].join("-");
   return `${prefix}_${date}_${time}-${pad(now.getMilliseconds(), 3)}.${extension}`;
 }
 
-function showCapture(blob, type, fileName = null) {
+function showCapture(blob, type, fileName = null, savedLocally = true) {
   clearCapture();
+  archiveWarning = !savedLocally;
 
   const extension = type === "photo" ? "jpg" : videoExtension(blob.type);
   const captureFileName = fileName || timestampFileName(extension);
   const url = URL.createObjectURL(blob);
   currentCapture = { blob, fileName: captureFileName, type, url };
 
-  const media = type === "photo" ? document.createElement("img") : document.createElement("video");
+  const media =
+    type === "photo"
+      ? document.createElement("img")
+      : document.createElement("video");
   media.src = url;
   media.className = "capture";
   media.alt = type === "photo" ? "Captured photo" : "";
@@ -215,7 +399,11 @@ function showCapture(blob, type, fileName = null) {
   els.result.replaceChildren(media);
   els.result.classList.remove("hidden");
   els.stage.classList.add("has-result");
-  setStatus(type === "photo" ? "Saved. Share with AirDrop." : "Video ready.");
+  setStatus(
+    archiveWarning
+      ? "Capture ready. Local save failed — share or download now."
+      : "Saved on this device. Share or take another.",
+  );
   setBusy(false);
 }
 
@@ -226,35 +414,40 @@ async function takePhoto() {
   setStatus("Get ready.");
   await runTimer();
 
-  const video = els.camera;
   const canvas = els.snapshot;
-  canvas.width = video.videoWidth || 1280;
-  canvas.height = video.videoHeight || 720;
+  const dimensions = cameraDimensions();
+  canvas.width = dimensions.width;
+  canvas.height = dimensions.height;
 
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   const captureFilter = filterForCanvas(selectedFilter);
   const canvasFilterApplied = typeof ctx.filter === "string";
   ctx.save();
   if (canvasFilterApplied) ctx.filter = captureFilter;
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  drawCameraFrame(ctx, canvas.width, canvas.height);
   ctx.restore();
   if (captureFilter !== "none" && !canvasFilterApplied) {
     // If a browser ignored canvas filters, the fallback keeps saved photos from being unfiltered.
     applyCanvasFilter(ctx, canvas.width, canvas.height, selectedFilter);
   }
   drawPhotoOverlays(ctx, canvas.width, canvas.height);
-  setRingLight(false);
 
-  canvas.toBlob(async (blob) => {
-    if (!blob) {
-      setStatus("Photo failed. Try again.");
-      setBusy(false);
-      return;
-    }
-    const fileName = timestampFileName("jpg");
-    await archiveCapture(blob, fileName);
-    showCapture(blob, "photo", fileName);
-  }, "image/jpeg", 0.92);
+  canvas.toBlob(
+    async (blob) => {
+      if (!blob) {
+        setStatus("Photo failed. Try again.");
+        setBusy(false);
+        return;
+      }
+      const fileName = timestampFileName("jpg");
+      const saved = await archiveCapture(blob, fileName);
+      showCapture(blob, "photo", fileName, saved);
+      if (!saved)
+        setStatus("Photo ready. Local save failed — share or download now.");
+    },
+    "image/jpeg",
+    0.92,
+  );
 }
 
 async function recordVideo(prompt) {
@@ -262,9 +455,23 @@ async function recordVideo(prompt) {
   clearCapture();
   setBusy(true);
   activeConfessionalPrompt = prompt;
-  setStatus("Get ready.");
-  await runTimer();
+  setStatus("Preparing video…");
 
+  let hasAudio = false;
+  try {
+    microphoneStream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+    });
+    hasAudio = true;
+  } catch (_) {
+    /* Recording remains available without sound. */
+  }
+  setStatus(
+    hasAudio
+      ? "Get ready."
+      : "Microphone unavailable. Video will have no sound.",
+  );
+  await runTimer();
   chunks = [];
   const mimeType = pickVideoMimeType();
   try {
@@ -277,37 +484,71 @@ async function recordVideo(prompt) {
     return;
   }
   const activeRecorder = recorder;
+  let recordingFailed = false;
   activeRecorder.ondataavailable = (event) => {
     if (event.data.size > 0) chunks.push(event.data);
   };
   activeRecorder.onerror = () => {
+    recordingFailed = true;
     clearTimeout(videoStopTimer);
     stopVideoCompositor();
     if (recorder === activeRecorder) recorder = null;
     activeConfessionalPrompt = null;
-    els.confessionalMode.innerHTML = '<span class="capture-mode-icon" aria-hidden="true">🎙️</span><span>Confessional</span>';
-    els.confessionalMode.classList.remove("recording");
+    resetVideoButton();
     setBusy(false);
     setStatus("Video recording failed. Try again.");
   };
   activeRecorder.onstop = async () => {
     clearTimeout(videoStopTimer);
     stopVideoCompositor();
-    const blob = new Blob(chunks, { type: activeRecorder.mimeType || "video/webm" });
-    const fileName = timestampFileName(videoExtension(blob.type), "BRIXPIX_CONFESSIONAL");
+    if (recordingFailed) return;
+    if (!chunks.length) {
+      recorder = null;
+      activeConfessionalPrompt = null;
+      resetVideoButton();
+      setBusy(false);
+      setStatus("Video was empty. Please try again.");
+      return;
+    }
+    resetVideoButton();
+    const blob = new Blob(chunks, {
+      type: activeRecorder.mimeType || "video/webm",
+    });
+    const fileName = timestampFileName(
+      videoExtension(blob.type),
+      "BRIXPIX_CONFESSIONAL",
+    );
     if (recorder === activeRecorder) recorder = null;
     const savedLocally = await archiveCapture(blob, fileName);
-    showCapture(blob, "video", fileName);
+    showCapture(blob, "video", fileName, savedLocally);
     activeConfessionalPrompt = null;
     if (!savedLocally) setStatus("Video ready, but local archive save failed.");
   };
 
-  activeRecorder.start();
+  try {
+    activeRecorder.start();
+  } catch (_) {
+    stopVideoCompositor();
+    recorder = null;
+    setBusy(false);
+    setStatus("Video could not start. Try again.");
+    return;
+  }
+  const startedAt = performance.now();
+  els.recordingIndicator.classList.remove("hidden");
+  els.recordingTime.textContent = "00:00 / 00:15";
+  recordingClock = setInterval(() => {
+    els.recordingTime.textContent = `00:${String(Math.min(15, Math.floor((performance.now() - startedAt) / 1000))).padStart(2, "0")} / 00:15`;
+  }, 250);
   videoStopTimer = setTimeout(stopVideo, VIDEO_MAX_MS);
   els.confessionalMode.textContent = "Stop Recording";
   els.confessionalMode.classList.add("recording");
   els.confessionalMode.disabled = false;
-  setStatus("Recording. Tap Stop, or it stops automatically at 15 seconds.");
+  setStatus(
+    hasAudio
+      ? "Recording. Stops at 15 seconds."
+      : "Recording without sound. Microphone access was unavailable.",
+  );
 }
 
 function createCompositedVideoStream() {
@@ -316,14 +557,13 @@ function createCompositedVideoStream() {
     throw new Error("Canvas video capture is unavailable");
   }
 
-  const sourceWidth = els.camera.videoWidth || 1280;
-  const sourceHeight = els.camera.videoHeight || 720;
-  const stageRect = els.stage.getBoundingClientRect();
-  const frameWidth = stageRect.width || sourceWidth;
-  const frameHeight = stageRect.height || sourceHeight;
-  const scale = Math.min(1, VIDEO_MAX_WIDTH / Math.max(frameWidth, frameHeight));
-  canvas.width = Math.max(2, Math.round((frameWidth * scale) / 2) * 2);
-  canvas.height = Math.max(2, Math.round((frameHeight * scale) / 2) * 2);
+  const dimensions = cameraDimensions();
+  const scale = Math.min(
+    1,
+    VIDEO_MAX_WIDTH / Math.max(dimensions.width, dimensions.height),
+  );
+  canvas.width = Math.max(2, Math.round((dimensions.width * scale) / 2) * 2);
+  canvas.height = Math.max(2, Math.round((dimensions.height * scale) / 2) * 2);
 
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   const frameInterval = 1000 / VIDEO_FRAME_RATE;
@@ -331,7 +571,10 @@ function createCompositedVideoStream() {
 
   const renderFrame = (timestamp) => {
     if (!recordingOutputStream) return;
-    if (!videoRenderLastTime || timestamp - videoRenderLastTime >= frameInterval) {
+    if (
+      !videoRenderLastTime ||
+      timestamp - videoRenderLastTime >= frameInterval
+    ) {
       videoRenderLastTime = timestamp;
       drawCompositedVideoFrame(ctx, canvas.width, canvas.height);
     }
@@ -341,35 +584,33 @@ function createCompositedVideoStream() {
   drawCompositedVideoFrame(ctx, canvas.width, canvas.height);
   const output = canvas.captureStream(VIDEO_FRAME_RATE);
   recordingOutputStream = output;
-  stream.getAudioTracks().forEach((track) => output.addTrack(track.clone()));
+  microphoneStream
+    ?.getAudioTracks()
+    .forEach((track) => output.addTrack(track.clone()));
   videoRenderFrame = requestAnimationFrame(renderFrame);
   return output;
 }
 
 function drawCompositedVideoFrame(ctx, width, height) {
-  const videoRect = mediaDisplayRect(
-    width,
-    height,
-    els.camera.videoWidth || width,
-    els.camera.videoHeight || height
-  );
   const captureFilter = filterForCanvas(selectedFilter);
   const canvasFilterApplied = typeof ctx.filter === "string";
-  ctx.fillStyle = "#090909";
-  ctx.fillRect(0, 0, width, height);
   ctx.save();
   if (canvasFilterApplied) ctx.filter = captureFilter;
-  ctx.drawImage(els.camera, videoRect.x, videoRect.y, videoRect.width, videoRect.height);
+  drawCameraFrame(ctx, width, height);
   ctx.restore();
-
-  if (captureFilter !== "none" && !canvasFilterApplied) {
+  if (captureFilter !== "none" && !canvasFilterApplied)
     applyCanvasFilter(ctx, width, height, selectedFilter);
-  }
-  drawPhotoOverlays(ctx, width, height, true);
-  if (activeConfessionalPrompt) drawConfessionalPrompt(ctx, width, height, activeConfessionalPrompt);
+  drawPhotoOverlays(ctx, width, height);
+  if (activeConfessionalPrompt)
+    drawConfessionalPrompt(ctx, width, height, activeConfessionalPrompt);
 }
 
 function stopVideoCompositor() {
+  clearInterval(recordingClock);
+  recordingClock = null;
+  els.recordingIndicator.classList.add("hidden");
+  microphoneStream?.getTracks().forEach((track) => track.stop());
+  microphoneStream = null;
   if (videoRenderFrame !== null) cancelAnimationFrame(videoRenderFrame);
   videoRenderFrame = null;
   videoRenderLastTime = 0;
@@ -382,29 +623,41 @@ function stopVideoCompositor() {
 function createVideoRecorder(recordingStream, mimeType) {
   const options = {
     videoBitsPerSecond: VIDEO_BITS_PER_SECOND,
-    audioBitsPerSecond: AUDIO_BITS_PER_SECOND
+    audioBitsPerSecond: AUDIO_BITS_PER_SECOND,
   };
   if (mimeType) options.mimeType = mimeType;
 
   try {
     return new MediaRecorder(recordingStream, options);
   } catch (error) {
-    return mimeType ? new MediaRecorder(recordingStream, { mimeType }) : new MediaRecorder(recordingStream);
+    return mimeType
+      ? new MediaRecorder(recordingStream, { mimeType })
+      : new MediaRecorder(recordingStream);
   }
+}
+
+function resetVideoButton() {
+  els.confessionalMode.innerHTML =
+    '<span class="video-icon" aria-hidden="true"></span><span>Record video</span>';
+  els.confessionalMode.classList.remove("recording");
 }
 
 function stopVideo() {
   if (!recorder || recorder.state !== "recording") return;
   clearTimeout(videoStopTimer);
-  els.confessionalMode.innerHTML = '<span class="capture-mode-icon" aria-hidden="true">🎙️</span><span>Confessional</span>';
-  els.confessionalMode.classList.remove("recording");
+  resetVideoButton();
   recorder.stop();
   setBusy(true);
   setStatus("Saving video.");
 }
 
 function pickVideoMimeType() {
-  const types = ["video/mp4", "video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
+  const types = [
+    "video/mp4",
+    "video/webm;codecs=vp9",
+    "video/webm;codecs=vp8",
+    "video/webm",
+  ];
   return types.find((type) => MediaRecorder.isTypeSupported(type)) || "";
 }
 
@@ -415,24 +668,38 @@ function videoExtension(mimeType) {
 async function shareCapture() {
   if (!currentCapture) return;
 
-  const file = new File([currentCapture.blob], currentCapture.fileName, { type: currentCapture.blob.type });
+  const file = new File([currentCapture.blob], currentCapture.fileName, {
+    type: currentCapture.blob.type,
+  });
 
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+  if (
+    navigator.share &&
+    navigator.canShare &&
+    navigator.canShare({ files: [file] })
+  ) {
     try {
       await navigator.share({
         files: [file],
         title: "BRIXPIX",
-        text: "BRICK 2026"
+        text: "BRICK 2026",
       });
       setStatus("Shared.");
       return;
     } catch (error) {
-      setStatus("Share canceled.");
-      return;
+      if (error.name === "AbortError") {
+        setStatus("Share canceled.");
+        return;
+      }
     }
   }
 
-  setStatus("Share unavailable on this device.");
+  const link = document.createElement("a");
+  link.href = currentCapture.url;
+  link.download = currentCapture.fileName;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setStatus("Download started.");
 }
 
 function setFilter(filterName, button) {
@@ -455,12 +722,14 @@ function refreshApp() {
 }
 
 function rotateCamera(degrees) {
+  if (busy || currentCapture) return;
   cameraRotation = normalizeDegrees(cameraRotation + degrees);
-  els.booth.style.setProperty("--camera-rotation", `${cameraRotation}deg`);
+  updateCameraLayout();
+  renderFilterPreviews();
 }
 
 function addSticker(kind) {
-  const stageRect = els.stage.getBoundingClientRect();
+  if (busy || currentCapture) return;
   const countOffset = stickers.length % 4;
   const imageSticker = isImageSticker(kind);
   const sticker = {
@@ -471,25 +740,26 @@ function addSticker(kind) {
     x: 0.5 + countOffset * 0.04,
     y: 0.46 + countOffset * 0.04,
     scale: imageSticker ? 0.9 : 0.72,
-    rotation: countOffset % 2 ? 4 : -4
+    rotation: countOffset % 2 ? 4 : -4,
   };
   nextStickerId += 1;
   stickers.push(sticker);
   selectedStickerId = sticker.id;
   renderStickers();
   closeStickerPicker(false);
-  setStatus(stageRect.width ? "Drag sticker. Pinch to resize/rotate." : "Sticker added.");
+  setStatus("Drag to move. Pinch or use the handle to resize and rotate.");
 }
 
 function openStickerPicker() {
-  els.stickerPicker.classList.remove("hidden");
+  closeConfessionalPicker(false);
+  openDialog(els.stickerPicker);
   els.openStickerPicker.setAttribute("aria-expanded", "true");
   els.closeStickerPicker.focus();
 }
 
 function closeStickerPicker(returnFocus = true) {
   if (els.stickerPicker.classList.contains("hidden")) return;
-  els.stickerPicker.classList.add("hidden");
+  closeDialog(els.stickerPicker);
   els.openStickerPicker.setAttribute("aria-expanded", "false");
   if (returnFocus) els.openStickerPicker.focus();
 }
@@ -497,13 +767,13 @@ function closeStickerPicker(returnFocus = true) {
 function openConfessionalPicker() {
   if (!stream || busy) return;
   closeStickerPicker(false);
-  els.confessionalPicker.classList.remove("hidden");
+  openDialog(els.confessionalPicker);
   els.closeConfessionalPicker.focus();
 }
 
 function closeConfessionalPicker(returnFocus = true) {
   if (els.confessionalPicker.classList.contains("hidden")) return;
-  els.confessionalPicker.classList.add("hidden");
+  closeDialog(els.confessionalPicker);
   if (returnFocus) els.confessionalMode.focus();
 }
 
@@ -534,13 +804,61 @@ function renderStickers() {
     const node = document.createElement("div");
     node.className = `editable-sticker${emojiSticker(sticker.kind) ? " diamond" : ""}${isImageSticker(sticker.kind) ? " image-sticker" : ""}${sticker.id === selectedStickerId ? " selected" : ""}`;
     node.dataset.stickerId = String(sticker.id);
+    node.tabIndex = 0;
+    node.setAttribute("role", "button");
+    node.setAttribute(
+      "aria-label",
+      `${sticker.text || sticker.kind} sticker. Arrow keys move; Delete removes.`,
+    );
+    node.setAttribute("aria-pressed", String(sticker.id === selectedStickerId));
+    node.addEventListener("focus", () => selectSticker(sticker.id));
+    node.addEventListener("keydown", (event) => {
+      if (busy || currentCapture) return;
+      if (
+        ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)
+      ) {
+        event.preventDefault();
+        const step = event.shiftKey ? 0.05 : 0.01;
+        sticker.x = clamp(
+          sticker.x +
+            (event.key === "ArrowRight"
+              ? step
+              : event.key === "ArrowLeft"
+                ? -step
+                : 0),
+          0.05,
+          0.95,
+        );
+        sticker.y = clamp(
+          sticker.y +
+            (event.key === "ArrowDown"
+              ? step
+              : event.key === "ArrowUp"
+                ? -step
+                : 0),
+          0.05,
+          0.95,
+        );
+        updateStickerNode(sticker);
+      } else if (event.key === "Delete" || event.key === "Backspace") {
+        event.preventDefault();
+        removeSelectedSticker();
+      }
+    });
     if (isImageSticker(sticker.kind)) {
       const image = document.createElement("img");
       image.src = IMAGE_STICKERS[sticker.kind].src;
       image.alt = "";
       image.draggable = false;
       node.append(image);
-      node.style.setProperty("--sticker-aspect", String(IMAGE_STICKERS[sticker.kind].aspect));
+      node.style.setProperty(
+        "--sticker-aspect",
+        String(IMAGE_STICKERS[sticker.kind].aspect),
+      );
+      node.style.setProperty(
+        "--sticker-width",
+        `${IMAGE_STICKERS[sticker.kind].width}px`,
+      );
     } else {
       node.textContent = sticker.text;
       node.style.background = sticker.fill;
@@ -552,6 +870,7 @@ function renderStickers() {
     node.addEventListener("pointerdown", startStickerGesture);
     els.stickersLayer.append(node);
   });
+  updateStickerTools();
 }
 
 function selectedSticker() {
@@ -559,14 +878,15 @@ function selectedSticker() {
 }
 
 function rotateSelectedSticker() {
+  if (busy || currentCapture) return;
   const sticker = selectedSticker();
   if (!sticker) return;
   sticker.rotation = normalizeDegrees(sticker.rotation + 15);
-  renderStickers();
+  updateStickerNode(sticker);
 }
 
 function removeSelectedSticker() {
-  if (!selectedStickerId) return;
+  if (!selectedStickerId || busy || currentCapture) return;
   stickers = stickers.filter((sticker) => sticker.id !== selectedStickerId);
   selectedStickerId = stickers.length ? stickers[stickers.length - 1].id : null;
   renderStickers();
@@ -574,11 +894,13 @@ function removeSelectedSticker() {
 
 function startStickerGesture(event) {
   const node = event.currentTarget;
-  const sticker = stickers.find((item) => item.id === Number(node.dataset.stickerId));
-  if (!sticker) return;
-
+  const sticker = stickers.find(
+    (item) => item.id === Number(node.dataset.stickerId),
+  );
+  if (!sticker || busy || currentCapture) return;
+  if (activePointers.size && sticker.id !== selectedStickerId) return;
   event.preventDefault();
-  selectedStickerId = sticker.id;
+  selectSticker(sticker.id);
   els.stickersLayer.querySelectorAll(".editable-sticker").forEach((item) => {
     item.classList.toggle("selected", item === node);
   });
@@ -595,7 +917,7 @@ function moveStickerGesture(event) {
 
   const sticker = selectedSticker();
   if (!sticker) return;
-  const stageRect = els.stage.getBoundingClientRect();
+  const stageRect = els.liveOverlays.getBoundingClientRect();
 
   if (activePointers.size >= 2 && gesture.mode === "pinch") {
     const points = [...activePointers.values()];
@@ -605,12 +927,30 @@ function moveStickerGesture(event) {
     const ratio = currentDistance / Math.max(1, gesture.distance);
 
     sticker.scale = clamp(gesture.scale * ratio, 0.22, 3.2);
-    sticker.rotation = normalizeDegrees(gesture.rotation + currentAngle - gesture.angle);
-    sticker.x = clamp(gesture.x + (currentCenter.x - gesture.center.x) / stageRect.width, 0.04, 0.96);
-    sticker.y = clamp(gesture.y + (currentCenter.y - gesture.center.y) / stageRect.height, 0.04, 0.96);
+    sticker.rotation = normalizeDegrees(
+      gesture.rotation + currentAngle - gesture.angle,
+    );
+    sticker.x = clamp(
+      gesture.x + (currentCenter.x - gesture.center.x) / stageRect.width,
+      0.04,
+      0.96,
+    );
+    sticker.y = clamp(
+      gesture.y + (currentCenter.y - gesture.center.y) / stageRect.height,
+      0.04,
+      0.96,
+    );
   } else {
-    sticker.x = clamp(gesture.x + (event.clientX - gesture.pointer.x) / stageRect.width, 0.04, 0.96);
-    sticker.y = clamp(gesture.y + (event.clientY - gesture.pointer.y) / stageRect.height, 0.04, 0.96);
+    sticker.x = clamp(
+      gesture.x + (event.clientX - gesture.pointer.x) / stageRect.width,
+      0.04,
+      0.96,
+    );
+    sticker.y = clamp(
+      gesture.y + (event.clientY - gesture.pointer.y) / stageRect.height,
+      0.04,
+      0.96,
+    );
   }
 
   updateStickerNode(sticker);
@@ -622,7 +962,9 @@ function endStickerGesture(event) {
 
   if (activePointers.size === 0) {
     gesture = null;
-    els.stickersLayer.querySelectorAll(".editable-sticker").forEach((node) => node.classList.remove("dragging"));
+    els.stickersLayer
+      .querySelectorAll(".editable-sticker")
+      .forEach((node) => node.classList.remove("dragging"));
     return;
   }
 
@@ -641,24 +983,27 @@ function makeGesture(sticker) {
       x: sticker.x,
       y: sticker.y,
       scale: sticker.scale,
-      rotation: sticker.rotation
+      rotation: sticker.rotation,
     };
   }
   return {
     mode: "drag",
     pointer: points[0],
     x: sticker.x,
-    y: sticker.y
+    y: sticker.y,
   };
 }
 
 function updateStickerNode(sticker) {
-  const node = els.stickersLayer.querySelector(`[data-sticker-id="${sticker.id}"]`);
+  const node = els.stickersLayer.querySelector(
+    `[data-sticker-id="${sticker.id}"]`,
+  );
   if (!node) return;
   node.style.setProperty("--sticker-x", `${sticker.x * 100}%`);
   node.style.setProperty("--sticker-y", `${sticker.y * 100}%`);
   node.style.setProperty("--sticker-scale", String(sticker.scale));
   node.style.setProperty("--sticker-rotation", `${sticker.rotation}deg`);
+  updateStickerTools();
 }
 
 function applyCanvasFilter(ctx, width, height, filterName) {
@@ -687,11 +1032,11 @@ function applyCanvasFilter(ctx, width, height, filterName) {
     } else if (filterName === "acid") {
       r = contrast(g * 1.55, 1.28);
       g = contrast(b * 1.35, 1.28);
-      b = contrast(r * 1.2 + 28, 1.28);
+      b = contrast(data[i] * 1.2 + 28, 1.28);
     } else if (filterName === "disco") {
       r = contrast(b * 1.45 + 12, 1.2);
-      g = contrast(r * 0.85, 1.2);
-      b = contrast(g * 1.55 + 18, 1.2);
+      g = contrast(data[i] * 0.85, 1.2);
+      b = contrast(data[i + 1] * 1.55 + 18, 1.2);
     } else if (filterName === "dream") {
       r = contrast(r * 1.12 + 16, 1.04);
       g = contrast(g * 1.02 + 8, 1.02);
@@ -711,24 +1056,27 @@ function applyCanvasFilter(ctx, width, height, filterName) {
 
 function filterForCanvas(filterName) {
   if (filterName === "warm") return "sepia(0.3) saturate(1.15) contrast(1.08)";
-  if (filterName === "flash") return "brightness(1.16) contrast(1.22) saturate(1.1)";
+  if (filterName === "flash")
+    return "brightness(1.16) contrast(1.22) saturate(1.1)";
   if (filterName === "mono") return "grayscale(1) contrast(1.22)";
-  if (filterName === "acid") return "hue-rotate(95deg) saturate(2.2) contrast(1.28)";
-  if (filterName === "disco") return "hue-rotate(250deg) saturate(2.3) contrast(1.2) brightness(1.06)";
-  if (filterName === "dream") return "sepia(0.2) saturate(1.55) hue-rotate(318deg) brightness(1.1)";
-  if (filterName === "vhs") return "contrast(1.36) saturate(1.65) hue-rotate(180deg)";
+  if (filterName === "acid")
+    return "hue-rotate(95deg) saturate(2.2) contrast(1.28)";
+  if (filterName === "disco")
+    return "hue-rotate(250deg) saturate(2.3) contrast(1.2) brightness(1.06)";
+  if (filterName === "dream")
+    return "sepia(0.2) saturate(1.55) hue-rotate(318deg) brightness(1.1)";
+  if (filterName === "vhs")
+    return "contrast(1.36) saturate(1.65) hue-rotate(180deg)";
   return "none";
 }
 
-function drawPhotoOverlays(ctx, width, height, matchStage = false) {
-  const scale = Math.max(1, width / 1280);
+function drawPhotoOverlays(ctx, width, height) {
+  const rect = els.liveOverlays.getBoundingClientRect();
+  const scale = width / Math.max(1, rect.width);
   if (els.logoOverlay.checked) drawLogo(ctx, width, scale);
-  stickers.forEach((sticker) => {
-    const point = matchStage
-      ? { x: sticker.x * width, y: sticker.y * height }
-      : stickerCanvasPoint(sticker, width, height);
-    drawSticker(ctx, sticker, point.x, point.y, scale);
-  });
+  stickers.forEach((sticker) =>
+    drawSticker(ctx, sticker, sticker.x * width, sticker.y * height, scale),
+  );
 }
 
 function drawConfessionalPrompt(ctx, width, height, prompt) {
@@ -749,34 +1097,29 @@ function drawConfessionalPrompt(ctx, width, height, prompt) {
   ctx.font = `700 ${10 * scale}px Arial, Helvetica, sans-serif`;
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  ctx.fillText("BRIXPIX CONFESSIONAL", x + 14 * scale, y + 20 * scale);
+  ctx.fillText("BRICK 2026 · VIDEO", x + 14 * scale, y + 20 * scale);
   ctx.fillStyle = "#171310";
   ctx.font = `italic ${24 * scale}px Georgia, Times New Roman, serif`;
-  ctx.fillText(prompt, x + 14 * scale, y + 48 * scale);
+  ctx.fillText(prompt, x + 14 * scale, y + 48 * scale, boxWidth - 28 * scale);
   ctx.restore();
 }
 
 function drawLogo(ctx, width, scale) {
-  const boxWidth = 160 * scale;
-  const boxHeight = 74 * scale;
-  const x = width - boxWidth - 28 * scale;
-  const y = 34 * scale;
+  const logo = document.querySelector(".booth-logo");
+  const style = getComputedStyle(logo);
   ctx.save();
-  ctx.translate(x + boxWidth / 2, y + boxHeight / 2);
-  ctx.rotate(0.03);
-  ctx.fillStyle = "#171310";
-  ctx.strokeStyle = "#f4efe2";
-  ctx.lineWidth = 5 * scale;
-  rectPath(ctx, -boxWidth / 2, -boxHeight / 2, boxWidth, boxHeight);
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = "#f4efe2";
-  ctx.font = `${28 * scale}px Arial, Helvetica, sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText("BRIX", 0, -12 * scale);
-  ctx.fillStyle = "#f1c64b";
-  ctx.fillText("PIX", 0, 19 * scale);
+  ctx.font = `italic ${parseFloat(style.fontSize) * scale}px Georgia, serif`;
+  ctx.fillStyle = "#fff";
+  ctx.textAlign = "right";
+  ctx.textBaseline = "top";
+  ctx.shadowColor = "#0007";
+  ctx.shadowBlur = 6 * scale;
+  ctx.shadowOffsetY = 2 * scale;
+  ctx.fillText(
+    "brick2026",
+    width - parseFloat(style.right) * scale,
+    parseFloat(style.top) * scale,
+  );
   ctx.restore();
 }
 
@@ -787,24 +1130,24 @@ function drawSticker(ctx, sticker, centerX, centerY, baseScale) {
     return;
   }
   const isEmoji = emojiSticker(sticker.kind);
-  const paddingX = (isEmoji ? 12 : 16) * scale;
+  const paddingX = (isEmoji ? 12 : 15) * scale;
   ctx.save();
-  ctx.font = `${isEmoji ? 74 * scale : 34 * scale}px Arial, Helvetica, sans-serif`;
+  ctx.font = `700 ${isEmoji ? 74 * scale : 34 * scale}px Arial, Helvetica, sans-serif`;
   const metrics = ctx.measureText(sticker.text);
-  const width = metrics.width + paddingX * 2;
-  const height = (isEmoji ? 94 : 56) * scale;
+  const width = metrics.width + paddingX * 2 + 6 * scale;
+  const height = (isEmoji ? 100 : 60) * scale;
   ctx.translate(centerX, centerY);
   ctx.rotate((sticker.rotation * Math.PI) / 180);
   ctx.fillStyle = sticker.fill;
   ctx.strokeStyle = "#171310";
-  ctx.lineWidth = 4 * scale;
+  ctx.lineWidth = 3 * scale;
   rectPath(ctx, -width / 2, -height / 2, width, height);
   ctx.fill();
   ctx.stroke();
   ctx.fillStyle = "#171310";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(sticker.text, 0, isEmoji ? 0 : 2 * scale);
+  ctx.fillText(sticker.text, 0, 0);
   ctx.restore();
 }
 
@@ -825,19 +1168,6 @@ function rectPath(ctx, x, y, width, height) {
   ctx.beginPath();
   ctx.rect(x, y, width, height);
   ctx.closePath();
-}
-
-function stickerCanvasPoint(sticker, width, height) {
-  const stageRect = els.stage.getBoundingClientRect();
-  const videoRect = mediaDisplayRect(stageRect.width, stageRect.height, els.camera.videoWidth || width, els.camera.videoHeight || height);
-  const stageX = sticker.x * stageRect.width;
-  const stageY = sticker.y * stageRect.height;
-  const clampedX = clamp(stageX, videoRect.x, videoRect.x + videoRect.width);
-  const clampedY = clamp(stageY, videoRect.y, videoRect.y + videoRect.height);
-  return {
-    x: ((clampedX - videoRect.x) / videoRect.width) * width,
-    y: ((clampedY - videoRect.y) / videoRect.height) * height
-  };
 }
 
 function mediaDisplayRect(stageWidth, stageHeight, mediaWidth, mediaHeight) {
@@ -881,6 +1211,7 @@ function emojiSticker(kind) {
 function setSelected(selector, selectedButton) {
   document.querySelectorAll(selector).forEach((button) => {
     button.classList.toggle("selected", button === selectedButton);
+    button.setAttribute("aria-pressed", String(button === selectedButton));
   });
 }
 
@@ -889,10 +1220,22 @@ function openArchiveDb() {
   dbPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
     request.onupgradeneeded = () => {
-      request.result.createObjectStore(STORE_NAME, { keyPath: "id", autoIncrement: true });
+      request.result.createObjectStore(STORE_NAME, {
+        keyPath: "id",
+        autoIncrement: true,
+      });
     };
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      request.result.onversionchange = () => {
+        request.result.close();
+        dbPromise = null;
+      };
+      resolve(request.result);
+    };
     request.onerror = () => reject(request.error);
+  }).catch((error) => {
+    dbPromise = null;
+    throw error;
   });
   return dbPromise;
 }
@@ -907,7 +1250,7 @@ async function archiveCapture(blob, fileName = timestampFileName("jpg")) {
         createdAt: new Date().toISOString(),
         fileName,
         uploadedAt: null,
-        uploadAttempts: 0
+        uploadAttempts: 0,
       });
       tx.oncomplete = resolve;
       tx.onerror = () => reject(tx.error);
@@ -917,7 +1260,8 @@ async function archiveCapture(blob, fileName = timestampFileName("jpg")) {
     syncArchiveUploads();
     return true;
   } catch (error) {
-    setStatus("Capture ready. Archive save failed on this browser.");
+    archiveWarning = true;
+    setStatus("Capture ready. Local save failed — share or download now.");
     return false;
   }
 }
@@ -927,26 +1271,31 @@ function getUploadEndpoint() {
 }
 
 async function uploadCapture(record, endpoint) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
   try {
     const dataUrl = await blobToDataUrl(record.blob);
     const response = await fetch(endpoint, {
       method: "POST",
+      signal: controller.signal,
       mode: "cors",
       credentials: "omit",
       headers: {
-        "Content-Type": "text/plain"
+        "Content-Type": "text/plain",
       },
       body: JSON.stringify({
         fileName: record.fileName || timestampFileName("jpg"),
         mimeType: record.blob.type || "image/jpeg",
-        dataUrl
-      })
+        dataUrl,
+      }),
     });
     if (!response.ok) return false;
     const result = await response.json();
     return result.ok === true;
   } catch (error) {
     return false;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -956,15 +1305,6 @@ function blobToDataUrl(blob) {
     reader.onload = () => resolve(reader.result);
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(blob);
-  });
-}
-
-async function getArchivedPhotos() {
-  const db = await openArchiveDb();
-  return new Promise((resolve, reject) => {
-    const request = db.transaction(STORE_NAME, "readonly").objectStore(STORE_NAME).getAll();
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
   });
 }
 
@@ -996,20 +1336,61 @@ function scheduleUploadRetry() {
 
 function prepareUploadQueue() {
   if (uploadPreparationPromise) return uploadPreparationPromise;
-
   uploadPreparationPromise = (async () => {
-    if (localStorage.getItem(UPLOAD_VERIFICATION_KEY) === "1") return;
-
-    const archivedPhotos = await getArchivedPhotos();
-    for (const photo of archivedPhotos) {
-      if (photo.uploadedAt) {
-        await updateArchivedPhoto(photo.id, { uploadedAt: null });
+    if (uploadQueuePrepared) return;
+    try {
+      if (localStorage.getItem(UPLOAD_VERIFICATION_KEY) === "1") {
+        uploadQueuePrepared = true;
+        return;
       }
-    }
-    localStorage.setItem(UPLOAD_VERIFICATION_KEY, "1");
-  })();
-
+    } catch (_) {}
+    const db = await openArchiveDb();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      const cursor = tx.objectStore(STORE_NAME).openCursor();
+      cursor.onsuccess = () => {
+        const item = cursor.result;
+        if (!item) return;
+        if (item.value.uploadedAt)
+          item.update({ ...item.value, uploadedAt: null });
+        item.continue();
+      };
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+    uploadQueuePrepared = true;
+    try {
+      localStorage.setItem(UPLOAD_VERIFICATION_KEY, "1");
+    } catch (_) {}
+  })().catch((error) => {
+    uploadPreparationPromise = null;
+    throw error;
+  });
   return uploadPreparationPromise;
+}
+
+async function nextArchiveCapture(afterId = 0, pendingOnly = true) {
+  const db = await openArchiveDb();
+  return new Promise((resolve, reject) => {
+    const request = db
+      .transaction(STORE_NAME)
+      .objectStore(STORE_NAME)
+      .openCursor(IDBKeyRange.lowerBound(afterId, true));
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) {
+        resolve(null);
+        return;
+      }
+      if (!pendingOnly || !cursor.value.uploadedAt) {
+        resolve(cursor.value);
+        return;
+      }
+      cursor.continue();
+    };
+    request.onerror = () => reject(request.error);
+  });
 }
 
 async function syncArchiveUploads() {
@@ -1036,29 +1417,34 @@ async function syncArchiveUploads() {
     let uploadedCount = 0;
     let uploadFailed = false;
 
-    const archivedPhotos = await getArchivedPhotos();
-    const pending = archivedPhotos.filter((capture) => !capture.uploadedAt);
-
-    for (const capture of pending) {
+    let afterId = 0;
+    for (
+      let capture = await nextArchiveCapture(afterId);
+      capture;
+      capture = await nextArchiveCapture(afterId)
+    ) {
+      afterId = capture.id;
       const ok = await uploadCapture(capture, endpoint);
       if (ok) {
         uploadedCount += 1;
         await updateArchivedPhoto(capture.id, {
           uploadedAt: new Date().toISOString(),
-          uploadAttempts: (capture.uploadAttempts || 0) + 1
+          uploadAttempts: (capture.uploadAttempts || 0) + 1,
         });
       } else {
         uploadFailed = true;
         await updateArchivedPhoto(capture.id, {
-          uploadAttempts: (capture.uploadAttempts || 0) + 1
+          uploadAttempts: (capture.uploadAttempts || 0) + 1,
         });
+        break; // A failed endpoint should not receive the entire queue again.
       }
     }
 
     if (uploadFailed) {
       scheduleUploadRetry();
-      if (!busy) setStatus("Saved locally. Cloud upload will retry.");
-    } else if (uploadedCount && currentCapture) {
+      if (!busy && currentCapture && !archiveWarning)
+        setStatus("Saved on this device. Drive upload will retry.");
+    } else if (uploadedCount && currentCapture && !busy && !archiveWarning) {
       setStatus("Saved locally and to Drive.");
     }
     updateArchiveCount();
@@ -1076,30 +1462,52 @@ async function syncArchiveUploads() {
 async function updateArchiveCount() {
   if (!isAdmin) return;
   try {
-    const photos = await getArchivedPhotos();
-    els.archiveCount.textContent = `${photos.length} saved`;
+    const db = await openArchiveDb();
+    const count = await new Promise((resolve, reject) => {
+      const request = db
+        .transaction(STORE_NAME)
+        .objectStore(STORE_NAME)
+        .count();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    els.archiveCount.textContent = `${count} saved`;
   } catch (error) {
     els.archiveCount.textContent = "archive unavailable";
   }
 }
 
 async function exportArchive() {
-  const photos = await getArchivedPhotos();
-  if (!photos.length) {
-    setStatus("No saved photos yet.");
-    return;
-  }
-
-  for (const photo of photos) {
-    const url = URL.createObjectURL(photo.blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = photo.fileName || `brixpix-${photo.id}.jpg`;
-    document.body.append(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
-    await new Promise((resolve) => setTimeout(resolve, 220));
+  if (busy) return;
+  setBusy(true);
+  try {
+    let capture = await nextArchiveCapture(0, false);
+    if (!capture) {
+      setStatus("No saved captures yet.");
+      return;
+    }
+    // Read one blob at a time, including videos, rather than loading the archive.
+    while (capture) {
+      const url = URL.createObjectURL(capture.blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download =
+        capture.fileName ||
+        `brixpix-${capture.id}.${capture.blob.type.startsWith("video/") ? videoExtension(capture.blob.type) : "jpg"}`;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      await new Promise((resolve) => setTimeout(resolve, 220));
+      capture = await nextArchiveCapture(capture.id, false);
+    }
+    setStatus(
+      "Archive downloads started. Allow multiple downloads if prompted.",
+    );
+  } catch (_) {
+    setStatus("Archive could not be read. Try again on the original device.");
+  } finally {
+    setBusy(false);
   }
 }
 
@@ -1126,7 +1534,7 @@ function angle(a, b) {
 function midpoint(a, b) {
   return {
     x: (a.x + b.x) / 2,
-    y: (a.y + b.y) / 2
+    y: (a.y + b.y) / 2,
   };
 }
 
@@ -1136,6 +1544,150 @@ function normalizeDegrees(value) {
   if (next < -180) next += 360;
   return next;
 }
+
+function selectSticker(id) {
+  selectedStickerId = id;
+  els.stickersLayer.querySelectorAll(".editable-sticker").forEach((node) => {
+    const selected = Number(node.dataset.stickerId) === id;
+    node.classList.toggle("selected", selected);
+    node.setAttribute("aria-pressed", String(selected));
+  });
+  updateStickerTools();
+}
+
+function updateStickerTools() {
+  const sticker = selectedSticker();
+  const node =
+    sticker &&
+    els.stickersLayer.querySelector(`[data-sticker-id="${sticker.id}"]`);
+  const visible = node && !busy && !currentCapture;
+  els.stickerTools.classList.toggle("hidden", !visible);
+  if (!visible) return;
+  const stage = els.stage.getBoundingClientRect();
+  const rect = node.getBoundingClientRect();
+  const width = 140;
+  els.stickerTools.style.left = `${clamp(rect.left + rect.width / 2 - stage.left - width / 2, 8, stage.width - width - 8)}px`;
+  const above = rect.top - stage.top - 52;
+  els.stickerTools.style.top = `${clamp(above >= 8 ? above : rect.bottom - stage.top + 8, 8, stage.height - 52)}px`;
+}
+
+function startHandleGesture(event) {
+  const sticker = selectedSticker();
+  if (!sticker || busy || currentCapture) return;
+  event.preventDefault();
+  const frame = els.liveOverlays.getBoundingClientRect();
+  const center = {
+    x: frame.left + sticker.x * frame.width,
+    y: frame.top + sticker.y * frame.height,
+  };
+  const pointer = { x: event.clientX, y: event.clientY };
+  handleGesture = {
+    id: event.pointerId,
+    center,
+    distance: distance(center, pointer),
+    angle: angle(center, pointer),
+    scale: sticker.scale,
+    rotation: sticker.rotation,
+  };
+  els.resizeSticker.setPointerCapture(event.pointerId);
+}
+
+function moveHandleGesture(event) {
+  if (!handleGesture || event.pointerId !== handleGesture.id) return;
+  const sticker = selectedSticker();
+  if (!sticker) return;
+  event.preventDefault();
+  const pointer = { x: event.clientX, y: event.clientY };
+  sticker.scale = clamp(
+    (handleGesture.scale * distance(handleGesture.center, pointer)) /
+      Math.max(1, handleGesture.distance),
+    0.22,
+    3.2,
+  );
+  sticker.rotation = normalizeDegrees(
+    handleGesture.rotation +
+      angle(handleGesture.center, pointer) -
+      handleGesture.angle,
+  );
+  updateStickerNode(sticker);
+}
+
+function openDialog(dialog) {
+  selectSticker(null);
+  dialog.classList.remove("hidden");
+  [...els.booth.children].forEach((child) => {
+    if (child !== dialog && !child.classList.contains("picker"))
+      child.inert = true;
+  });
+}
+
+function closeDialog(dialog) {
+  dialog.classList.add("hidden");
+  [...els.booth.children].forEach((child) => {
+    child.inert = false;
+  });
+}
+
+function returnToCamera() {
+  clearCapture();
+  setStatus("Ready.");
+}
+
+function resetGuest() {
+  if (busy) return;
+  clearCapture();
+  stickers = [];
+  selectedStickerId = null;
+  activePointers.clear();
+  gesture = null;
+  handleGesture = null;
+  renderStickers();
+  setFilter("none", document.querySelector('[data-filter-choice="none"]'));
+  els.timer.value = "3";
+  els.logoOverlay.checked = true;
+  els.booth.dataset.logo = "on";
+  setStatus("Ready.");
+}
+
+els.retakeCapture.addEventListener("click", returnToCamera);
+els.nextGuest.addEventListener("click", resetGuest);
+els.resizeSticker.addEventListener("pointerdown", startHandleGesture);
+els.resizeSticker.addEventListener("pointermove", moveHandleGesture);
+["pointerup", "pointercancel", "lostpointercapture"].forEach((type) =>
+  els.resizeSticker.addEventListener(type, () => {
+    handleGesture = null;
+  }),
+);
+els.resizeSticker.addEventListener("keydown", (event) => {
+  const sticker = selectedSticker();
+  if (!sticker || !event.key.startsWith("Arrow")) return;
+  event.preventDefault();
+  sticker.scale = clamp(
+    sticker.scale +
+      (event.key === "ArrowUp" || event.key === "ArrowRight" ? 0.1 : -0.1),
+    0.22,
+    3.2,
+  );
+  updateStickerNode(sticker);
+});
+els.stage.addEventListener("pointerdown", (event) => {
+  if (event.target === els.camera || event.target === els.stage)
+    selectSticker(null);
+});
+document.addEventListener("keydown", (event) => {
+  const dialog = document.querySelector(".picker:not(.hidden)");
+  if (!dialog || event.key !== "Tab") return;
+  const buttons = [...dialog.querySelectorAll("button:not(:disabled)")];
+  const first = buttons[0],
+    last = buttons[buttons.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+});
 
 els.startCamera.addEventListener("click", startCamera);
 els.refreshApp.addEventListener("click", refreshApp);
@@ -1159,7 +1711,9 @@ document.addEventListener("keydown", (event) => {
     closeConfessionalPicker();
   }
 });
-els.closeConfessionalPicker.addEventListener("click", () => closeConfessionalPicker());
+els.closeConfessionalPicker.addEventListener("click", () =>
+  closeConfessionalPicker(),
+);
 els.confessionalPicker.addEventListener("click", (event) => {
   if (event.target === els.confessionalPicker) closeConfessionalPicker();
 });
@@ -1173,28 +1727,41 @@ els.logoOverlay.addEventListener("change", () => {
   els.booth.dataset.logo = els.logoOverlay.checked ? "on" : "off";
 });
 document.querySelectorAll("[data-filter-choice]").forEach((button) => {
-  button.addEventListener("click", () => setFilter(button.dataset.filterChoice, button));
+  button.addEventListener("click", () =>
+    setFilter(button.dataset.filterChoice, button),
+  );
 });
 document.querySelectorAll("[data-sticker-choice]").forEach((button) => {
-  button.addEventListener("click", () => addSticker(button.dataset.stickerChoice));
+  button.addEventListener("click", () =>
+    addSticker(button.dataset.stickerChoice),
+  );
 });
 els.rotateSticker.addEventListener("click", rotateSelectedSticker);
 els.removeSticker.addEventListener("click", removeSelectedSticker);
 window.addEventListener("pointermove", moveStickerGesture);
 window.addEventListener("pointerup", endStickerGesture);
 window.addEventListener("pointercancel", endStickerGesture);
-window.addEventListener("orientationchange", restartCameraForOrientation);
-window.addEventListener("resize", restartCameraForOrientation);
+els.camera.addEventListener("resize", updateCameraLayout);
+new ResizeObserver(updateCameraLayout).observe(els.stage);
 window.addEventListener("online", syncArchiveUploads);
 if (window.visualViewport) {
-  window.visualViewport.addEventListener("resize", restartCameraForOrientation);
+  window.visualViewport.addEventListener("resize", updateCameraLayout);
 }
 window.addEventListener("pagehide", () => {
   clearCapture();
+  if (recorder?.state === "recording") stopVideo();
   stopCameraStream();
+  wakeLock?.release();
+});
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) startCamera();
+});
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") requestWakeLock();
 });
 
 if (isAdmin) {
+  els.booth.classList.add("is-admin");
   els.adminPanel.classList.remove("hidden");
   els.exportArchive.addEventListener("click", exportArchive);
   updateArchiveCount();
@@ -1203,3 +1770,5 @@ if (isAdmin) {
 setBusy(false);
 els.booth.style.setProperty("--camera-rotation", "0deg");
 syncArchiveUploads();
+
+startCamera();

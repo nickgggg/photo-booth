@@ -15,7 +15,7 @@ Camera access requires HTTPS or localhost. GitHub Pages gives you HTTPS for free
 
 Every photo and video is silently saved to local IndexedDB inside this web app on the iPad after capture. This is not the iOS Photos app, so saved captures will not appear in Photos automatically. Guests do not see a gallery, and clearing the guest preview does not remove the owner archive. Videos stop automatically after 15 seconds and use a conservative bitrate to keep free cloud uploads reliable.
 
-To export saved photos, open the app on the same iPad with `?admin=1` at the end of the URL and use Export Saved Photos.
+To export saved photos, open the app on the same iPad with `?admin=1` at the end of the URL and use Export archive.
 
 GitHub Pages cannot receive automatic background uploads from the app. A browser-based GitHub upload would require exposing a writable GitHub token to guests, which is not safe.
 
@@ -51,3 +51,26 @@ Receipt-printer output is funny, but it is a separate project. Most thermal rece
 - A second "guestbook mode" later: record a 10-second video toast.
 - A QR code nearby that opens a shared Google Photos/Drive upload folder for guests who want to contribute phone photos.
 - Print two copies when printing: one for the guest, one for a physical guestbook.
+
+## Development
+
+The app is static HTML, CSS and JavaScript; there is no build step.
+
+```sh
+python3 -m http.server 8000 --bind 127.0.0.1
+node --check app.js
+```
+
+In the prepared cloud environment, run the browser checks with the server running:
+
+```sh
+NODE_PATH=/workspace/onboarding-tools/node_modules node tests/booth.cjs
+```
+
+For another machine, install `playwright@1.58.2` in an external tools directory and set `NODE_PATH` to its `node_modules`. The test defaults to `/usr/bin/chromium`; set `CHROMIUM_PATH` to your Chromium executable. It uses simulated camera/microphone input and intercepts every external browser request. It never uploads synthetic captures to Drive.
+
+Camera access starts automatically when the browser allows it; denied access reveals a retry button. Photos do not request microphone permission. Video requests microphone permission when selected and can record silently if denied. Use an HTTPS deployment to test on an iPad; a cloud machine's localhost is not reachable from your phone.
+
+All guest controls and picker choices fit within the viewport on iPad in portrait and landscape. Selected stickers have move, resize/rotate and delete controls in the preview. Back to camera retains effects; Next guest resets stickers, filter, timer and watermark while preserving the screen-light setting and owner archive.
+
+See [REVIEW.md](REVIEW.md) for review findings and external integration limits.
