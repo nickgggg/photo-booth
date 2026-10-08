@@ -402,25 +402,7 @@ select {
   align-items: center;
   padding: 8px 16px;
 }
-.session-status {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  max-width: 280px;
-}
-.status-dot {
-  width: 7px;
-  height: 7px;
-  background: #ae2454;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.session-status p {
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--muted);
-  margin: 0;
-}
+
 .capture-actions {
   display: flex;
   align-items: center;
@@ -489,9 +471,6 @@ select {
 .result-actions .quiet-button {
   font-size: 12px;
   padding: 8px;
-}
-.booth.is-review .session-status {
-  max-width: 200px;
 }
 .booth.is-review .shutter {
   min-width: 160px;
@@ -779,21 +758,7 @@ select {
 .capture-dock {
   padding: 8px 16px;
 }
-.booth.is-review {
-  grid-template-rows: minmax(0, 1fr) 86px 98px;
-}
-.booth.is-review .capture-dock {
-  grid-template-columns: auto 1fr;
-  row-gap: 0;
-  align-content: center;
-}
-.booth.is-review .session-status {
-  grid-column: 1/-1;
-  grid-row: 2;
-  max-width: none;
-  justify-content: center;
-  min-height: 20px;
-}
+
 .booth.is-admin .controls {
   grid-template-columns: minmax(0, 1fr) 120px 208px 138px;
   position: relative;
@@ -801,9 +766,7 @@ select {
 .booth.is-admin {
   grid-template-rows: minmax(0, 1fr) 144px 80px;
 }
-.booth.is-admin.is-review {
-  grid-template-rows: minmax(0, 1fr) 144px 98px;
-}
+
 .admin-panel {
   grid-column: 1/-1;
   justify-content: flex-end;
@@ -812,9 +775,7 @@ select {
   .booth {
     grid-template-rows: minmax(0, 1fr) 166px 80px;
   }
-  .booth.is-review {
-    grid-template-rows: minmax(0, 1fr) 166px 98px;
-  }
+
   .controls,
   .booth.is-admin .controls {
     grid-template-columns: minmax(0, 1fr) 280px;
@@ -848,9 +809,7 @@ select {
   .booth.is-admin {
     grid-template-rows: minmax(0, 1fr) 216px 80px;
   }
-  .booth.is-admin.is-review {
-    grid-template-rows: minmax(0, 1fr) 216px 98px;
-  }
+
   .admin-panel {
     grid-column: 1/-1;
   }
@@ -868,17 +827,12 @@ select {
     padding: 8px;
     font-size: 13px;
   }
-  .session-status {
-    max-width: 150px;
-  }
 }
 @media (max-width: 600px) and (orientation: portrait) {
   .booth {
     grid-template-rows: minmax(0, 1fr) 160px 104px;
   }
-  .booth.is-review {
-    grid-template-rows: minmax(0, 1fr) 160px 128px;
-  }
+
   .controls,
   .booth.is-admin .controls {
     grid-template-columns: minmax(0, 1fr) 150px;
@@ -922,9 +876,7 @@ select {
   .booth.is-admin {
     grid-template-rows: minmax(0, 1fr) 210px 104px;
   }
-  .booth.is-admin.is-review {
-    grid-template-rows: minmax(0, 1fr) 210px 128px;
-  }
+
   .capture-dock {
     display: flex;
     flex-wrap: wrap;
@@ -951,14 +903,6 @@ select {
     min-height: 48px;
     font-size: 12px;
   }
-  .session-status {
-    order: 1;
-    max-width: 55%;
-    gap: 6px;
-  }
-  .session-status p {
-    font-size: 10px;
-  }
   .result-actions {
     order: 2;
   }
@@ -977,12 +921,6 @@ select {
     width: 100%;
     justify-content: center;
     gap: 12px;
-  }
-  .booth.is-review .session-status {
-    display: flex;
-    order: 3;
-    width: 100%;
-    max-width: none;
   }
   .stage-light,
   .stage-refresh {
@@ -1041,9 +979,7 @@ select {
     grid-template-columns: minmax(0, 1fr) 242px;
     grid-template-rows: minmax(0, 1fr) 74px;
   }
-  .booth.is-review {
-    grid-template-rows: minmax(0, 1fr) 82px;
-  }
+
   .stage {
     grid-column: 1;
     grid-row: 1;
@@ -1083,9 +1019,7 @@ select {
   .booth.is-admin {
     grid-template-rows: minmax(0, 1fr) 74px;
   }
-  .booth.is-admin.is-review {
-    grid-template-rows: minmax(0, 1fr) 82px;
-  }
+
   .booth.is-admin .controls {
     gap: 4px;
   }
@@ -1107,9 +1041,6 @@ select {
   }
   .capture-actions {
     gap: 4px;
-  }
-  .session-status p {
-    font-size: 10px;
   }
   .result-actions .quiet-button {
     font-size: 10px;
@@ -1161,4 +1092,55 @@ select {
   .control-label {
     margin-bottom: 3px;
   }
+}
+
+.session-actions {
+  display: flex;
+  align-items: center;
+}
+.reset-button {
+  background: #e9e9e9;
+  min-height: 48px;
+  padding: 10px 18px;
+}
+.capture-notice {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 8;
+  max-width: calc(100% - 150px);
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #202020e6;
+  color: white;
+  font-size: 13px;
+  line-height: 1.4;
+}
+@media (max-width: 600px) and (orientation: portrait) {
+  .session-actions {
+    order: 1;
+  }
+  .reset-button {
+    min-height: 44px;
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+  .booth.is-review .result-actions {
+    width: auto;
+    justify-content: flex-end;
+    gap: 3px;
+  }
+  .capture-notice {
+    left: 12px;
+    bottom: 12px;
+    font-size: 11px;
+    max-width: calc(100% - 125px);
+  }
+}
+.capture-dock {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+.capture-actions {
+  justify-content: center;
 }

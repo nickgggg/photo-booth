@@ -93,6 +93,9 @@ let videoRenderFrame = null;
 let videoRenderLastTime = 0;
 let recordingOutputStream = null;
 let currentCapture = null;
+let reviewingCapture = false;
+let lastRemoteShutterAt = -Infinity;
+let lastInputWasPointer = false;
 let busy = false;
 let selectedFilter = "none";
 let stickers = [];
@@ -126,8 +129,9 @@ Object.entries(IMAGE_STICKERS).forEach(([kind, config]) => {
 
 els.stickerChoiceCount.textContent = `${document.querySelectorAll("#stickerPicker [data-sticker-choice]").length} choices`;
 
-function setStatus(message) {
+function setStatus(message, severity = "info") {
   els.status.textContent = message;
+  els.status.classList.toggle("hidden", severity === "info");
 }
 
 function setBusy(nextBusy) {
@@ -139,7 +143,7 @@ function setBusy(nextBusy) {
   const isRecording = recorder && recorder.state === "recording";
   const hasCapture = Boolean(currentCapture);
   els.booth.classList.toggle("is-busy", busy);
-  els.booth.classList.toggle("is-review", hasCapture);
+  els.booth.classList.toggle("is-review", reviewingCapture);
   els.photoBooth.disabled = busy || !hasCamera;
   els.confessionalMode.disabled =
     (busy && !isRecording) || !hasCamera || !window.MediaRecorder;
@@ -147,22 +151,27 @@ function setBusy(nextBusy) {
   els.startCamera.disabled = cameraStarting;
   els.refreshApp.disabled = busy;
   els.retakeCapture.classList.toggle("hidden", !hasCapture);
-  els.nextGuest.classList.toggle("hidden", !hasCapture);
   els.retakeCapture.disabled = busy;
   els.nextGuest.disabled = busy;
-  els.photoBooth.querySelector("span:last-child").textContent = hasCapture
-    ? "Take another"
-    : "Take photo";
+  els.photoBooth.querySelector("span:last-child").textContent = "Take photo";
+  els.retakeCapture.textContent = reviewingCapture
+    ? "Back to camera"
+    : currentCapture?.type === "video"
+      ? "View video"
+      : "View photo";
+  els.retakeCapture.setAttribute("aria-expanded", String(reviewingCapture));
   els.controls
     .querySelectorAll("button, select, input")
-    .forEach((control) => (control.disabled = busy || hasCapture));
+    .forEach((control) => (control.disabled = busy || reviewingCapture));
   els.ringLightButton.disabled = busy && !isRecording;
   updateStickerTools();
 }
 
 function clearCapture() {
+  els.result.querySelector("video")?.pause();
   if (currentCapture) URL.revokeObjectURL(currentCapture.url);
   currentCapture = null;
+  reviewingCapture = false;
   els.stage.classList.remove("has-result");
   els.result.replaceChildren();
   els.result.classList.add("hidden");
@@ -357,19 +366,20 @@ function showCapture(blob, type, fileName = null, savedLocally = true) {
   }
 
   els.result.replaceChildren(media);
-  els.result.classList.remove("hidden");
-  els.stage.classList.add("has-result");
+  els.result.classList.add("hidden");
+  els.stage.classList.remove("has-result");
   setStatus(
     archiveWarning
       ? "Capture ready. Local save failed — share or download now."
-      : "Saved on this device. Share or take another.",
+      : "Saved on this device.",
+    archiveWarning ? "error" : "info",
   );
   setBusy(false);
 }
 
 async function takePhoto() {
   if (!stream || busy) return;
-  clearCapture();
+  returnToCamera();
   setBusy(true);
   setStatus("Get ready.");
   await runTimer();
@@ -395,7 +405,7 @@ async function takePhoto() {
   canvas.toBlob(
     async (blob) => {
       if (!blob) {
-        setStatus("Photo failed. Try again.");
+        setStatus("Photo failed. Try again.", "error");
         setBusy(false);
         return;
       }
@@ -403,7 +413,10 @@ async function takePhoto() {
       const saved = await archiveCapture(blob, fileName);
       showCapture(blob, "photo", fileName, saved);
       if (!saved)
-        setStatus("Photo ready. Local save failed — share or download now.");
+        setStatus(
+          "Photo ready. Local save failed — share or download now.",
+          "error",
+        );
     },
     "image/jpeg",
     0.92,
@@ -412,7 +425,7 @@ async function takePhoto() {
 
 async function recordVideo(prompt) {
   if (!stream || busy || !window.MediaRecorder) return;
-  clearCapture();
+  returnToCamera();
   setBusy(true);
   activeConfessionalPrompt = prompt;
   setStatus("Preparing video…");
@@ -439,7 +452,10 @@ async function recordVideo(prompt) {
     recorder = createVideoRecorder(recordingOutputStream, mimeType);
   } catch (error) {
     stopVideoCompositor();
-    setStatus("Video recording is not available. Refresh and try again.");
+    setStatus(
+      "Video recording is not available. Refresh and try again.",
+      "error",
+    );
     setBusy(false);
     return;
   }
@@ -456,7 +472,7 @@ async function recordVideo(prompt) {
     activeConfessionalPrompt = null;
     resetVideoButton();
     setBusy(false);
-    setStatus("Video recording failed. Try again.");
+    setStatus("Video recording failed. Try again.", "error");
   };
   activeRecorder.onstop = async () => {
     clearTimeout(videoStopTimer);
@@ -467,7 +483,7 @@ async function recordVideo(prompt) {
       activeConfessionalPrompt = null;
       resetVideoButton();
       setBusy(false);
-      setStatus("Video was empty. Please try again.");
+      setStatus("Video was empty. Please try again.", "error");
       return;
     }
     resetVideoButton();
@@ -482,7 +498,8 @@ async function recordVideo(prompt) {
     const savedLocally = await archiveCapture(blob, fileName);
     showCapture(blob, "video", fileName, savedLocally);
     activeConfessionalPrompt = null;
-    if (!savedLocally) setStatus("Video ready, but local archive save failed.");
+    if (!savedLocally)
+      setStatus("Video ready, but local archive save failed.", "error");
   };
 
   try {
@@ -491,7 +508,7 @@ async function recordVideo(prompt) {
     stopVideoCompositor();
     recorder = null;
     setBusy(false);
-    setStatus("Video could not start. Try again.");
+    setStatus("Video could not start. Try again.", "error");
     return;
   }
   const startedAt = performance.now();
@@ -682,13 +699,13 @@ function refreshApp() {
 }
 
 function rotateCamera(degrees) {
-  if (busy || currentCapture) return;
+  if (busy || reviewingCapture) return;
   cameraRotation = normalizeDegrees(cameraRotation + degrees);
   updateCameraLayout();
 }
 
 function addSticker(kind) {
-  if (busy || currentCapture) return;
+  if (busy || reviewingCapture) return;
   const countOffset = stickers.length % 4;
   const imageSticker = isImageSticker(kind);
   const sticker = {
@@ -772,7 +789,7 @@ function renderStickers() {
     node.setAttribute("aria-pressed", String(sticker.id === selectedStickerId));
     node.addEventListener("focus", () => selectSticker(sticker.id));
     node.addEventListener("keydown", (event) => {
-      if (busy || currentCapture) return;
+      if (busy || reviewingCapture) return;
       if (
         ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)
       ) {
@@ -837,7 +854,7 @@ function selectedSticker() {
 }
 
 function rotateSelectedSticker() {
-  if (busy || currentCapture) return;
+  if (busy || reviewingCapture) return;
   const sticker = selectedSticker();
   if (!sticker) return;
   sticker.rotation = normalizeDegrees(sticker.rotation + 15);
@@ -845,7 +862,7 @@ function rotateSelectedSticker() {
 }
 
 function removeSelectedSticker() {
-  if (!selectedStickerId || busy || currentCapture) return;
+  if (!selectedStickerId || busy || reviewingCapture) return;
   stickers = stickers.filter((sticker) => sticker.id !== selectedStickerId);
   selectedStickerId = stickers.length ? stickers[stickers.length - 1].id : null;
   renderStickers();
@@ -856,7 +873,7 @@ function startStickerGesture(event) {
   const sticker = stickers.find(
     (item) => item.id === Number(node.dataset.stickerId),
   );
-  if (!sticker || busy || currentCapture) return;
+  if (!sticker || busy || reviewingCapture) return;
   if (activePointers.size && sticker.id !== selectedStickerId) return;
   event.preventDefault();
   selectSticker(sticker.id);
@@ -1218,7 +1235,10 @@ async function archiveCapture(blob, fileName = timestampFileName("jpg")) {
     return true;
   } catch (error) {
     archiveWarning = true;
-    setStatus("Capture ready. Local save failed — share or download now.");
+    setStatus(
+      "Capture ready. Local save failed — share or download now.",
+      "error",
+    );
     return false;
   }
 }
@@ -1400,7 +1420,7 @@ async function syncArchiveUploads() {
     if (uploadFailed) {
       scheduleUploadRetry();
       if (!busy && currentCapture && !archiveWarning)
-        setStatus("Saved on this device. Drive upload will retry.");
+        setStatus("Saved on this device. Drive upload will retry.", "warning");
     } else if (uploadedCount && currentCapture && !busy && !archiveWarning) {
       setStatus("Saved locally and to Drive.");
     }
@@ -1462,7 +1482,10 @@ async function exportArchive() {
       "Archive downloads started. Allow multiple downloads if prompted.",
     );
   } catch (_) {
-    setStatus("Archive could not be read. Try again on the original device.");
+    setStatus(
+      "Archive could not be read. Try again on the original device.",
+      "error",
+    );
   } finally {
     setBusy(false);
   }
@@ -1517,7 +1540,7 @@ function updateStickerTools() {
   const node =
     sticker &&
     els.stickersLayer.querySelector(`[data-sticker-id="${sticker.id}"]`);
-  const visible = node && !busy && !currentCapture;
+  const visible = node && !busy && !reviewingCapture;
   els.stickerTools.classList.toggle("hidden", !visible);
   if (!visible) return;
   const stage = els.stage.getBoundingClientRect();
@@ -1530,7 +1553,7 @@ function updateStickerTools() {
 
 function startHandleGesture(event) {
   const sticker = selectedSticker();
-  if (!sticker || busy || currentCapture) return;
+  if (!sticker || busy || reviewingCapture) return;
   event.preventDefault();
   const frame = els.liveOverlays.getBoundingClientRect();
   const center = {
@@ -1586,8 +1609,24 @@ function closeDialog(dialog) {
 }
 
 function returnToCamera() {
-  clearCapture();
-  setStatus("Ready.");
+  reviewingCapture = false;
+  els.result.querySelector("video")?.pause();
+  els.result.classList.add("hidden");
+  els.stage.classList.remove("has-result");
+  setBusy(false);
+}
+
+function toggleCaptureReview() {
+  if (busy || !currentCapture) return;
+  if (reviewingCapture) {
+    returnToCamera();
+    return;
+  }
+  reviewingCapture = true;
+  selectSticker(null);
+  els.result.classList.remove("hidden");
+  els.stage.classList.add("has-result");
+  setBusy(false);
 }
 
 function resetGuest() {
@@ -1606,7 +1645,7 @@ function resetGuest() {
   setStatus("Ready.");
 }
 
-els.retakeCapture.addEventListener("click", returnToCamera);
+els.retakeCapture.addEventListener("click", toggleCaptureReview);
 els.nextGuest.addEventListener("click", resetGuest);
 els.resizeSticker.addEventListener("pointerdown", startHandleGesture);
 els.resizeSticker.addEventListener("pointermove", moveHandleGesture);
@@ -1645,6 +1684,51 @@ document.addEventListener("keydown", (event) => {
     first.focus();
   }
 });
+
+function handleRemoteShutter(event) {
+  const dedicatedKey = event.key === "Camera" || event.key === "AudioVolumeUp";
+  if (!dedicatedKey && !["Enter", " ", "Spacebar"].includes(event.key)) return;
+  if (event.altKey || event.ctrlKey || event.metaKey || event.isComposing)
+    return;
+  if (document.querySelector(".picker:not(.hidden)")) return;
+  if (!dedicatedKey && event.target instanceof Element) {
+    if (event.target.closest("input, select, textarea, [contenteditable]"))
+      return;
+    if (
+      !lastInputWasPointer &&
+      event.target.closest('button:not(#photoBooth), [role="button"]')
+    )
+      return;
+  }
+  event.preventDefault();
+  if (event.repeat || busy || els.photoBooth.disabled) return;
+  const now = performance.now();
+  if (now - lastRemoteShutterAt < 500) return;
+  lastRemoteShutterAt = now;
+  handlePhotoBooth();
+}
+
+document.addEventListener(
+  "pointerdown",
+  () => {
+    lastInputWasPointer = true;
+  },
+  true,
+);
+document.addEventListener(
+  "keydown",
+  (event) => {
+    if (event.key === "Tab" || event.key.startsWith("Arrow"))
+      lastInputWasPointer = false;
+  },
+  true,
+);
+// Let a remote take the next shot after a guest closes the native timer menu.
+// Keyboard navigation keeps focus in the field for normal editing.
+els.timer.addEventListener("change", () => {
+  if (lastInputWasPointer) els.camera.focus({ preventScroll: true });
+});
+document.addEventListener("keydown", handleRemoteShutter);
 
 els.startCamera.addEventListener("click", startCamera);
 els.refreshApp.addEventListener("click", refreshApp);

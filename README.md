@@ -25,6 +25,12 @@ This build includes a baked-in Google Apps Script webhook that saves each captur
 
 On iPad Safari, the Share button uses the native iOS share sheet when available. Guests can AirDrop, save, message, or email from there. If file sharing is unavailable, use Download.
 
+## Bluetooth shutter remote
+
+Enter and Space can trigger a photo from a keyboard-style Bluetooth remote. Camera and AudioVolumeUp keys are also handled if the browser delivers them. Held/repeated presses and presses during capture are ignored. Settings fields and open pickers keep normal keyboard behavior; keyboard navigation still activates focused buttons normally.
+
+**A volume-only remote cannot reliably trigger iPad Safari.** The standard volume-up action that takes a photo in Apple's Camera app is handled by iPadOS and is not exposed as a webpage shutter event. This remains true when the website is added to the home screen. There is no supported JavaScript API to intercept the system volume change. If your remote has a keyboard mode, use that; otherwise a remote that sends keyboard keys or a native camera app is needed. Simulated browser key tests do not verify a physical remote.
+
 ## Ring light
 
 The ring light toggle adds a large soft white screen border. For best results at a wedding booth, use an actual USB/battery ring light too.
@@ -71,6 +77,6 @@ For another machine, install `playwright@1.58.2` in an external tools directory 
 
 Camera access starts automatically when the browser allows it; denied access reveals a retry button. Photos do not request microphone permission. Video requests microphone permission when selected and can record silently if denied. Use an HTTPS deployment to test on an iPad; a cloud machine's localhost is not reachable from your phone.
 
-The header is removed and the camera occupies the space above compact controls. All guest controls and picker choices fit within the viewport on iPad in portrait and landscape. Filters are unlabeled color tiles with accessible names. Selected stickers have move, resize/rotate and delete controls in the preview. Back to camera retains effects; Next guest resets stickers, filter, timer and watermark while preserving the screen-light setting and owner archive.
+The header is removed and the camera occupies the space above compact controls. All guest controls and picker choices fit within the viewport on iPad in portrait and landscape. Filters are unlabeled color tiles with accessible names. Selected stickers have move, resize/rotate and delete controls in the preview. Photos and videos return immediately to the live camera. View photo / View video opens the latest capture; Back to camera closes the review while keeping Share available. Reset is always visible and clears the guest capture, stickers, filter, timer and watermark while preserving the camera connection, screen-light setting and owner archive. The idle status badge is removed; only actionable errors and upload warnings are shown.
 
 See [REVIEW.md](REVIEW.md) for review findings and external integration limits.

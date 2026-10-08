@@ -112,6 +112,15 @@ const check = (name, condition) => {
       await page.setViewportSize({ width, height });
       await open();
       check(`all controls fit ${width}x${height}`, await noClipping());
+      check(
+        `reset always visible ${width}x${height}`,
+        await page.locator("#nextGuest").isVisible(),
+      );
+      check(
+        `idle badge removed ${width}x${height}`,
+        (await page.locator(".session-status, .status-dot").count()) === 0 &&
+          !(await page.locator("#status").isVisible()),
+      );
       if (
         (width === 1024 && height === 768) ||
         (width === 768 && height === 1024)
@@ -334,7 +343,10 @@ const check = (name, condition) => {
       (await page.locator("#refreshApp").isDisabled()) &&
         (await page.locator("#timer").isDisabled()),
     );
-    await page.waitForSelector("#result img");
+    await page.waitForSelector("#result img", { state: "attached" });
+    await page.waitForFunction(
+      () => !document.querySelector("#photoBooth").disabled,
+    );
     await page.waitForFunction(
       () => document.querySelector("#result img").naturalWidth > 0,
     );
@@ -345,6 +357,20 @@ const check = (name, condition) => {
     check(
       "light remains on between captures",
       (await page.getAttribute("#ringLightButton", "aria-pressed")) === "true",
+    );
+    check(
+      "photo returns automatically to the live camera",
+      !(await page.locator("#result").isVisible()) &&
+        !(await page.locator("#timer").isDisabled()),
+    );
+    check(
+      "latest photo remains shareable on the live camera",
+      !(await page.locator("#shareCapture").isDisabled()),
+    );
+    await page.click("#retakeCapture");
+    check(
+      "view photo opens the latest capture",
+      await page.locator("#result").isVisible(),
     );
     check("review controls fit landscape", await noClipping());
     const captureURL = await page.locator("#result img").getAttribute("src");
@@ -376,7 +402,10 @@ const check = (name, condition) => {
     await page.click("#rotateCameraRight");
     await page.selectOption("#timer", "0");
     await page.click("#photoBooth");
-    await page.waitForSelector("#result img");
+    await page.waitForSelector("#result img", { state: "attached" });
+    await page.waitForFunction(
+      () => !document.querySelector("#photoBooth").disabled,
+    );
     await page.waitForFunction(
       () => document.querySelector("#result img").naturalWidth > 0,
     );
@@ -393,7 +422,15 @@ const check = (name, condition) => {
     );
     await page.click("#nextGuest");
     check(
-      "next guest resets effects and stickers",
+      "reset returns to camera without reloading",
+      !(await page.locator("#result").isVisible()) &&
+        (await page.evaluate(
+          () =>
+            document.querySelector("#camera").srcObject.getVideoTracks()[0].id,
+        )) === cameraTrack,
+    );
+    check(
+      "reset clears guest effects and stickers",
       (await sticker.count()) === 0 &&
         (await page.inputValue("#timer")) === "3" &&
         (await page.getAttribute(
@@ -413,12 +450,20 @@ const check = (name, condition) => {
       document.querySelector("#recordingTime").textContent.startsWith("00:01"),
     );
     await page.click("#confessionalMode");
-    await page.waitForSelector("#result video");
+    await page.waitForSelector("#result video", { state: "attached" });
+    await page.waitForFunction(
+      () => !document.querySelector("#photoBooth").disabled,
+    );
     check(
       "video capture archived",
       (await records()).some(
         (r) => r.type.startsWith("video/") && r.size > 1000,
       ),
+    );
+    check(
+      "video returns automatically to the live camera",
+      !(await page.locator("#result").isVisible()) &&
+        !(await page.locator("#shareCapture").isDisabled()),
     );
     check(
       "microphone released after recording",
@@ -428,7 +473,11 @@ const check = (name, condition) => {
     await page.click("#confessionalMode");
     await page.click('[data-confessional-prompt="Roast"]');
     await page.waitForSelector("#recordingIndicator:not(.hidden)");
-    await page.waitForSelector("#result video", { timeout: 20000 });
+    await page.waitForFunction(
+      () => !document.querySelector("#photoBooth").disabled,
+      null,
+      { timeout: 20000 },
+    );
     check(
       "video automatically stops at 15 seconds",
       !(await page.locator("#recordingIndicator").isVisible()),
@@ -442,6 +491,22 @@ const check = (name, condition) => {
     );
     uploadMode = "success";
     await page.evaluate(() => syncArchiveUploads());
+    await page.waitForFunction(async () => {
+      const db = await new Promise((resolve, reject) => {
+        const req = indexedDB.open("brixpix-archive");
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+      return new Promise((resolve, reject) => {
+        const req = db.transaction("photos").objectStore("photos").getAll();
+        req.onsuccess = () =>
+          resolve(
+            req.result.length > 0 &&
+              req.result.every((record) => !!record.uploadedAt),
+          );
+        req.onerror = () => reject(req.error);
+      });
+    });
     check(
       "successful Drive acknowledgment marks queue uploaded",
       (await records()).every((r) => !!r.uploadedAt),
@@ -527,7 +592,10 @@ const check = (name, condition) => {
       document.querySelector("#recordingTime").textContent.startsWith("00:01"),
     );
     await failure.click("#confessionalMode");
-    await failure.waitForSelector("#result video");
+    await failure.waitForSelector("#result video", { state: "attached" });
+    await failure.waitForFunction(
+      () => !document.querySelector("#photoBooth").disabled,
+    );
     await failure.click("#retakeCapture");
     await failure.evaluate(() => {
       const original = IDBDatabase.prototype.transaction;
@@ -538,7 +606,14 @@ const check = (name, condition) => {
       };
     });
     await failure.click("#photoBooth");
-    await failure.waitForSelector("#result img");
+    await failure.waitForSelector("#result img", { state: "attached" });
+    await failure.waitForFunction(
+      () => !document.querySelector("#photoBooth").disabled,
+    );
+    check(
+      "archive error notice is visible",
+      await failure.locator("#status").isVisible(),
+    );
     check(
       "local archive failure remains visible",
       (await failure.locator("#status").textContent()).includes(
@@ -550,6 +625,134 @@ const check = (name, condition) => {
       !(await failure.locator("#shareCapture").isDisabled()),
     );
     await failureContext.close();
+    const remoteContext = await browser.newContext({ permissions: ["camera"] });
+    await remoteContext.route("**/*", (r) =>
+      new URL(r.request().url()).origin === baseURL ? r.continue() : r.abort(),
+    );
+    const remote = await remoteContext.newPage();
+    remote.on("pageerror", (error) => errors.push(error.message));
+    await remote.goto(baseURL);
+    await remote.waitForFunction(
+      () => !document.querySelector("#photoBooth").disabled,
+    );
+    await remote.selectOption("#timer", "0");
+    const countRemote = () =>
+      remote.evaluate(async () => {
+        const db = await new Promise((resolve, reject) => {
+          const req = indexedDB.open("brixpix-archive");
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+        return new Promise((resolve, reject) => {
+          const req = db.transaction("photos").objectStore("photos").count();
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+      });
+    const sendKey = (key) =>
+      remote.dispatchEvent("body", "keydown", {
+        key,
+        bubbles: true,
+        cancelable: true,
+      });
+    await sendKey("Enter");
+    await remote.waitForFunction(
+      () => !document.querySelector("#shareCapture").disabled,
+    );
+    check("remote Enter takes one photo", (await countRemote()) === 1);
+    check(
+      "remote capture stays on live camera",
+      !(await remote.locator("#result").isVisible()),
+    );
+    await remote.dispatchEvent("body", "keydown", {
+      key: "Enter",
+      repeat: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    check("held remote key does not retrigger", (await countRemote()) === 1);
+    await remote.evaluate(() => document.querySelector("#timer").focus());
+    await remote.keyboard.press("Space");
+    check(
+      "shutter shortcut leaves settings alone",
+      (await countRemote()) === 1,
+    );
+    await remote.keyboard.press("Escape");
+    await remote.click("#openStickerPicker");
+    await sendKey("Enter");
+    check(
+      "remote does not capture through a picker",
+      (await countRemote()) === 1,
+    );
+    await remote.click("#closeStickerPicker");
+    await remote.selectOption("#timer", "3");
+    await remote.waitForTimeout(550); // Deliberate next press, outside debounce.
+    await sendKey(" ");
+    await remote.waitForSelector("#countdown:not(.hidden)");
+    await sendKey("Camera");
+    await remote.waitForFunction(
+      () => !document.querySelector("#photoBooth").disabled,
+    );
+    check(
+      "remote Space captures once despite a second press during countdown",
+      (await countRemote()) === 2,
+    );
+    await remote.selectOption("#timer", "0");
+    // This synthetic key tests the handler only. It does not establish that
+    // physical iPad volume buttons or volume-only remotes emit browser events.
+    await sendKey("AudioVolumeUp");
+    await remote.waitForFunction(
+      () => !document.querySelector("#photoBooth").disabled,
+    );
+    check(
+      "camera/volume HID key works when delivered by a browser",
+      (await countRemote()) === 3,
+    );
+    await remote.waitForTimeout(550); // Outside the remote duplicate-press window.
+    await remote.click('[data-filter-choice="mono"]');
+    await remote.keyboard.press("Space");
+    await remote.waitForFunction(
+      () => !document.querySelector("#photoBooth").disabled,
+    );
+    check(
+      "remote works after touching a filter button",
+      (await countRemote()) === 4,
+    );
+    await remote.keyboard.press("Tab");
+    await remote.keyboard.press("Enter");
+    check(
+      "keyboard navigation still activates controls normally",
+      (await countRemote()) === 4,
+    );
+    await remote.click("#retakeCapture");
+    check(
+      "latest remote capture can be reviewed",
+      await remote.locator("#result").isVisible(),
+    );
+    const nativeShareURL = await remote
+      .locator("#result img")
+      .getAttribute("src");
+    await remote.click("#retakeCapture");
+    const remoteDownload = remote.waitForEvent("download");
+    await remote.click("#shareCapture");
+    check(
+      "latest remote capture can still be downloaded after returning live",
+      (await remoteDownload).suggestedFilename().endsWith(".jpg"),
+    );
+    check(
+      "returning live preserves the latest blob",
+      (await remote.locator("#result img").getAttribute("src")) ===
+        nativeShareURL,
+    );
+    await remote.click("#nextGuest");
+    check(
+      "reset clears guest preview without deleting archive",
+      !(await remote.locator("#result").isVisible()) &&
+        (await remote.locator("#shareCapture").isDisabled()) &&
+        (await countRemote()) === 4,
+    );
+    await remoteContext.close();
+    check("no runtime errors in remote workflow", errors.length === 0);
     await context.close();
     console.log(`${passed} checks passed.`);
   } finally {

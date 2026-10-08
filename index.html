@@ -16,7 +16,7 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="apple-touch-icon" href="icons/brixpix-apple-touch-icon.png" />
     <link rel="icon" href="icons/brixpix-icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=20261005-2" />
+    <link rel="stylesheet" href="styles.css?v=20261008-1" />
   </head>
   <body>
     <svg
@@ -60,7 +60,14 @@
           </svg>
           Refresh
         </button>
-        <video id="camera" class="camera" autoplay playsinline muted></video>
+        <video
+          id="camera"
+          class="camera"
+          tabindex="-1"
+          autoplay
+          playsinline
+          muted
+        ></video>
         <canvas id="snapshot" class="hidden"></canvas>
         <div id="liveOverlays" class="live-overlays">
           <div class="booth-logo">brick2026</div>
@@ -71,6 +78,12 @@
           ></div>
         </div>
         <div id="result" class="result hidden"></div>
+        <p
+          id="status"
+          class="capture-notice hidden"
+          role="status"
+          aria-live="polite"
+        ></p>
         <div id="cameraWelcome" class="camera-welcome">
           <img class="welcome-art" src="stickers/brick-bn.png" alt="" />
           <p id="cameraMessage">Starting camera…</p>
@@ -268,9 +281,10 @@
       </aside>
 
       <footer class="capture-dock">
-        <div class="session-status">
-          <span class="status-dot" aria-hidden="true"></span>
-          <p id="status" role="status" aria-live="polite">Starting camera…</p>
+        <div class="session-actions">
+          <button id="nextGuest" class="reset-button" type="button">
+            Reset
+          </button>
         </div>
         <div class="capture-actions">
           <button id="photoBooth" class="shutter" type="button" disabled>
@@ -288,7 +302,7 @@
         </div>
         <div class="result-actions">
           <button id="retakeCapture" class="quiet-button hidden" type="button">
-            Back to camera</button
+            View photo</button
           ><button
             id="shareCapture"
             class="share-button"
@@ -298,9 +312,7 @@
             <svg class="icon" aria-hidden="true">
               <use href="#icon-share"></use>
             </svg>
-            Share</button
-          ><button id="nextGuest" class="quiet-button hidden" type="button">
-            Next guest
+            Share
           </button>
         </div>
       </footer>
@@ -474,6 +486,6 @@
         </div>
       </section>
     </main>
-    <script src="app.js?v=20261005-2"></script>
+    <script src="app.js?v=20261008-1"></script>
   </body>
 </html>
